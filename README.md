@@ -89,3 +89,13 @@ soyanga/
     psql --version
     git --version
 ---    
+### Comando para iniciar fronted y backend
+
+    cd ..
+   salir hasta estar encontrarse en ...\soyanga>
+- **luego ejecutar en comando para iniciar tanto fronted como backend gracias al json**
+   
+      npm run dev
+
+
+
