@@ -4,6 +4,7 @@ import com.soyanga.soyangabackend.dominio.*;
 import com.soyanga.soyangabackend.dto.ventas.VentaCrearDTO;
 import com.soyanga.soyangabackend.dto.ventas.VentaRespuestaDTO;
 import com.soyanga.soyangabackend.repositorio.catalogo.PresentacionProductoRepositorio;
+import com.soyanga.soyangabackend.repositorio.cobros.AplicacionPagoRepositorio;
 import com.soyanga.soyangabackend.repositorio.cobros.CuentaPorCobrarRepositorio;
 import com.soyanga.soyangabackend.repositorio.inventario.ExistenciaLoteRepositorio;
 import com.soyanga.soyangabackend.repositorio.inventario.MovimientoInventarioRepositorio;
@@ -27,9 +28,10 @@ public class VentaServicio {
     private final VentaDetalleLoteRepositorio ventaDetLoteRepo;
     private final CuentaPorCobrarRepositorio cxcRepo;
 
-    private final PresentacionProductoRepositorio presentacionRepo;
+    private final AplicacionPagoRepositorio aplPagoRepo;
     private final ExistenciaLoteRepositorio existenciaRepo;
     private final MovimientoInventarioRepositorio movRepo;
+    private final PresentacionProductoRepositorio presentacionRepo;
 
     @Transactional
     public VentaRespuestaDTO crear(VentaCrearDTO dto) {
@@ -190,7 +192,7 @@ public class VentaServicio {
         ventaRepo.save(venta);
 
         // 3) Si es crédito, generar CxC
-        if ("credito".equalsIgnoreCase(dto.getCondicionDePago())) {
+        if (condicion == Venta.CondicionPago.credito) {
             var cxc = CuentaPorCobrar.builder()
                     .idVenta(venta.getIdVenta())
                     .montoPendienteBob(totalNeto)
@@ -219,5 +221,64 @@ public class VentaServicio {
             throw new IllegalArgumentException("Valor inválido para " + campo + ": " + value);
         }
     }
+    @Transactional
+    public void anular(Long idVenta, String motivo) {
+        var venta = ventaRepo.findById(idVenta)
+                .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada: " + idVenta));
 
+        if ("anulada".equalsIgnoreCase(String.valueOf(venta.getEstadoVenta()))) {
+            throw new IllegalArgumentException("La venta ya está anulada");
+        }
+
+        // Traer detalles y sus lotes
+        var detalles = ventaDetRepo.findByIdVentaOrderByIdVentaDetalleAsc(idVenta);
+        if (detalles.isEmpty()) {
+            throw new IllegalStateException("La venta no tiene detalles");
+        }
+
+        // Reponer stock por cada lote usado en la venta
+        for (var det : detalles) {
+            var lotes = ventaDetLoteRepo.findByIdVentaDetalle(det.getIdVentaDetalle());
+            for (var dl : lotes) {
+                var exLock = existenciaRepo
+                        .lockByAlmacenAndIdLote(venta.getIdAlmacenDespacho(), dl.getIdLote())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "No existe existencia para almacén " + venta.getIdAlmacenDespacho() +
+                                        " y lote " + dl.getIdLote())
+                        );
+
+                // Devolver disponible
+                exLock.setCantidadDisponible(exLock.getCantidadDisponible().add(dl.getCantidad()));
+                exLock.setFechaUltimaActualizacion(java.time.LocalDateTime.now());
+                existenciaRepo.save(exLock);
+
+                // Movimiento de inventario (ajuste de ingreso)
+                var mov = MovimientoInventario.builder()
+                        .fechaMovimiento(java.time.LocalDateTime.now())
+                        .tipoMovimiento(MovimientoInventario.TipoMovimiento.ajuste)
+                        .idAlmacenDestino(venta.getIdAlmacenDespacho()) // ingreso al almacén de despacho
+                        .idLote(dl.getIdLote())
+                        .cantidad(dl.getCantidad())
+                        .referenciaModulo("venta")
+                        .idReferencia(det.getIdVentaDetalle())
+                        .observaciones("Anulación de venta #" + idVenta + (motivo != null ? (" — " + motivo) : ""))
+                        .build();
+                movRepo.save(mov);
+            }
+        }
+
+        // Si hay CxC asociada y NO tiene pagos aplicados, elimínala.
+        cxcRepo.findByIdVenta(idVenta).ifPresent(cxc -> {
+            long apps = aplPagoRepo.countByIdCuentaCobrar(cxc.getIdCuentaCobrar());
+            if (apps > 0) {
+                throw new IllegalArgumentException("No se puede anular: la CxC tiene pagos aplicados");
+            }
+            // Eliminar la CxC asociada (venta permanece para historial, pero sin deuda)
+            cxcRepo.deleteById(cxc.getIdCuentaCobrar());
+        });
+
+        // Marcar venta como anulada
+        venta.setEstadoVenta(Venta.EstadoVenta.anulada);
+        ventaRepo.save(venta);
+    }
 }
