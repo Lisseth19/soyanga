@@ -29,4 +29,8 @@ public class Moneda {
     @Column(name = "es_moneda_local", nullable = false)
     @Builder.Default
     private Boolean esMonedaLocal = false;
+
+    @Column(name = "estado_activo", nullable = false)
+    private boolean estadoActivo = true;
+
 }
