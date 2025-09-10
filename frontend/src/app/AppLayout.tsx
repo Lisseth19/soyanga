@@ -7,6 +7,7 @@ export default function AppLayout() {
                 <nav className="max-w-5xl mx-auto p-4 flex gap-4">
                     <Link to="/" className="font-semibold">SOYANGA</Link>
                     <NavLink to="/inventario/por-lote">Inventario por lote</NavLink>
+                    <NavLink to="/catalogo/monedas">Monedas</NavLink>
                     <Link to="/salud" className="hover:underline">API Health</Link>
                 </nav>
             </header>
