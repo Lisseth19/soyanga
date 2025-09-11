@@ -44,4 +44,15 @@ public class ExistenciaPorLote {
 
     @Column(name = "fecha_ultima_actualizacion", nullable = false)
     private LocalDateTime fechaUltimaActualizacion;
+    @PrePersist
+    public void prePersist() {
+        if (fechaUltimaActualizacion == null) {
+            fechaUltimaActualizacion = LocalDateTime.now();
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        fechaUltimaActualizacion = LocalDateTime.now();
+    }
 }
