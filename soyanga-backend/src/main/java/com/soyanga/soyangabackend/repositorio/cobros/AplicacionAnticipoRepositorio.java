@@ -15,4 +15,7 @@ public interface AplicacionAnticipoRepositorio extends JpaRepository<AplicacionA
         WHERE a.id_anticipo = :idAnticipo
         """, nativeQuery = true)
     BigDecimal totalAplicadoPorAnticipo(@Param("idAnticipo") Long idAnticipo);
+
+    @Query(value = "SELECT COALESCE(SUM(a.monto_aplicado_bob),0) FROM aplicaciones_de_anticipo a WHERE a.id_venta = :idVenta", nativeQuery = true)
+    java.math.BigDecimal totalAplicadoPorVenta(@Param("idVenta") Long idVenta);
 }
