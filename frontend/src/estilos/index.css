@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@layer base {
+  a { @apply no-underline text-inherit; }   /* sin subrayado, hereda color */
+  a:hover { @apply no-underline; }          /* sin subrayado al hover */
+}
+
+
 /* Base global */
 :root { color-scheme: light dark; }
 html, body, #root { height: 100%; }
@@ -17,6 +23,5 @@ body { /* Tema claro por defecto */
   background: var(--bg);
   color: var(--fg);
 }
-a { color: #2563eb } /* blue-600 */
-a:hover { text-decoration: underline; }
+
 pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace }
