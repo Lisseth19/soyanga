@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
-import { router } from "./app/rutas";
+import { router } from "./app/router/rutas";
 import "./estilos/index.css"; // tu Tailwind/global CSS
 
 const root = document.getElementById("root");
