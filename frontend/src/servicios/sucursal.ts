@@ -7,7 +7,12 @@ import type {
   SucursalFiltro,
 } from "@/types/sucursal";
 
-const BASE = "/api/v1/sucursales";
+export interface OpcionIdNombre {
+  id: number;
+  nombre: string;
+}
+
+const BASE = "/api/v1/catalogo/sucursales";
 
 /** Convierte un objeto de filtros a params limpios (Record<string, unknown>) */
 function toParams(obj: SucursalFiltro): Record<string, unknown> {
@@ -33,4 +38,8 @@ export const sucursalService = {
 
   remove: (id: number) =>
     http.del<void>(`${BASE}/${id}`),
+
+   // ⬇️ NUEVO: opciones para combos (id + nombre)
+  opciones: () =>
+    http.get<OpcionIdNombre[]>(`${BASE}/opciones`),
 };

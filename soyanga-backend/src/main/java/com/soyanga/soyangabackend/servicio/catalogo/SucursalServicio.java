@@ -21,8 +21,7 @@ public class SucursalServicio {
                 (q == null || q.isBlank()) ? null : q.trim(),
                 (ciudad == null || ciudad.isBlank()) ? null : ciudad.trim(),
                 soloActivos,
-                pageable
-        );
+                pageable);
         return page.map(p -> SucursalRespuestaDTO.builder()
                 .idSucursal(p.getIdSucursal())
                 .nombreSucursal(p.getNombreSucursal())
@@ -53,13 +52,15 @@ public class SucursalServicio {
         e.setNombreSucursal(dto.getNombreSucursal());
         e.setDireccion(dto.getDireccion());
         e.setCiudad(dto.getCiudad());
-        if (dto.getEstadoActivo() != null) e.setEstadoActivo(dto.getEstadoActivo());
+        if (dto.getEstadoActivo() != null)
+            e.setEstadoActivo(dto.getEstadoActivo());
         e = repo.save(e);
         return toDTO(e);
     }
 
     public void eliminar(Long id) {
-        if (!repo.existsById(id)) throw new IllegalArgumentException("Sucursal no encontrada: " + id);
+        if (!repo.existsById(id))
+            throw new IllegalArgumentException("Sucursal no encontrada: " + id);
         repo.deleteById(id);
     }
 
