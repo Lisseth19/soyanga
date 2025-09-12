@@ -5,6 +5,7 @@ import com.soyanga.soyangabackend.dominio.CompraDetalle;
 import com.soyanga.soyangabackend.dto.compras.*;
 import com.soyanga.soyangabackend.repositorio.compras.CompraDetalleRepositorio;
 import com.soyanga.soyangabackend.repositorio.compras.CompraRepositorio;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -52,7 +53,7 @@ public class CompraServicio {
                 .items(detalles)
                 .build();
     }
-
+    @Transactional
     public CompraRespuestaDTO crear(CompraCrearDTO dto) {
         var c = Compra.builder()
                 .idProveedor(dto.getIdProveedor())
@@ -65,7 +66,7 @@ public class CompraServicio {
         c = compraRepo.save(c);
         return obtener(c.getIdCompra());
     }
-
+    @Transactional
     public CompraDetalleRespuestaDTO agregarItem(Long idCompra, CompraDetalleCrearDTO dto) {
         var c = compraRepo.findById(idCompra)
                 .orElseThrow(() -> new IllegalArgumentException("Compra no encontrada: " + idCompra));
@@ -85,7 +86,7 @@ public class CompraServicio {
         d = detalleRepo.save(d);
         return toDetalleDto(d);
     }
-
+    @Transactional
     public CompraRespuestaDTO cambiarEstado(Long idCompra, String nuevo) {
         var c = compraRepo.findById(idCompra)
                 .orElseThrow(() -> new IllegalArgumentException("Compra no encontrada: " + idCompra));

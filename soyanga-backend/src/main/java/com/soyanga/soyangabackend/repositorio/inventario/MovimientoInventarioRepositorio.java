@@ -5,7 +5,10 @@ import com.soyanga.soyangabackend.repositorio.BaseRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface MovimientoInventarioRepositorio extends BaseRepository<MovimientoInventario, Long> {
@@ -61,4 +64,40 @@ public interface MovimientoInventarioRepositorio extends BaseRepository<Movimien
         ORDER BY fecha_movimiento, id_movimiento
         """, nativeQuery = true)
     List<MovimientoInventario> porVenta(Long idVenta);
+
+    interface MovimientoRow {
+        Long getIdMovimiento();
+        LocalDateTime getFechaMovimiento();
+        String getTipoMovimiento();
+        Long getIdLote();
+        BigDecimal getCantidad();
+        Long getIdAlmacenOrigen();
+        Long getIdAlmacenDestino();
+        String getReferenciaModulo();
+        Long getIdReferencia();
+    }
+
+    @Query(value = """
+        SELECT
+          m.id_movimiento      AS idMovimiento,
+          m.fecha_movimiento   AS fechaMovimiento,
+          m.tipo_movimiento    AS tipoMovimiento,
+          m.id_lote            AS idLote,
+          m.cantidad           AS cantidad,
+          m.id_almacen_origen  AS idAlmacenOrigen,
+          m.id_almacen_destino AS idAlmacenDestino,
+          m.referencia_modulo  AS referenciaModulo,
+          m.id_referencia      AS idReferencia
+        FROM movimientos_de_inventario m
+        WHERE (:loteId IS NULL OR m.id_lote = :loteId)
+          AND (:almacenId IS NULL OR m.id_almacen_origen = :almacenId OR m.id_almacen_destino = :almacenId)
+        ORDER BY m.fecha_movimiento DESC, m.id_movimiento DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<MovimientoRow> ultimos(
+            @Param("loteId") Long loteId,
+            @Param("almacenId") Long almacenId,
+            @Param("limit") int limit
+    );
+
 }

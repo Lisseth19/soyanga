@@ -50,4 +50,15 @@ public class CompraControlador {
                                             @RequestParam String nuevo) {
         return servicio.cambiarEstado(id, nuevo);
     }
+    @PostMapping("/{id}/aprobar")
+    public CompraRespuestaDTO aprobar(@PathVariable Long id) {
+        return servicio.cambiarEstado(id, "aprobada");
+    }
+
+    @PostMapping("/{id}/anular")
+    public CompraRespuestaDTO anular(@PathVariable Long id, @RequestParam(required = false) String motivo) {
+        // si quieres dejar constancia, apéndalo en observaciones dentro del servicio
+        return servicio.cambiarEstado(id, "anulada");
+    }
+
 }

@@ -1,0 +1,17 @@
+package com.soyanga.soyangabackend.repositorio.seguridad;
+
+import com.soyanga.soyangabackend.dominio.RolPermiso;
+import com.soyanga.soyangabackend.repositorio.BaseRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+
+import java.util.List;
+
+public interface RolPermisoRepositorio extends BaseRepository<RolPermiso, Long> {
+
+    List<RolPermiso> findByIdRol(Long idRol);
+
+    @Modifying
+    @Query(value = "DELETE FROM roles_permisos WHERE id_rol = :idRol", nativeQuery = true)
+    void deleteByIdRol(Long idRol);
+}

@@ -42,4 +42,25 @@ public interface VentaDetalleLoteRepositorio extends BaseRepository<VentaDetalle
         ORDER BY vdl.id_venta_detalle, vdl.id_venta_detalle_lote
         """, nativeQuery = true)
     List<LoteConsumoView> consumosPorVenta(Long idVenta);
+
+    interface VentaItemLoteProjection {
+        Long getIdVentaDetalle();
+        Long getIdLote();
+        String getNumeroLote();
+        java.math.BigDecimal getCantidad();
+    }
+
+    @Query(value = """
+        SELECT
+          vdl.id_venta_detalle AS idVentaDetalle,
+          vdl.id_lote          AS idLote,
+          l.numero_lote        AS numeroLote,
+          vdl.cantidad         AS cantidad
+        FROM ventas_detalle_lotes vdl
+        JOIN lotes l ON l.id_lote = vdl.id_lote
+        WHERE vdl.id_venta_detalle IN (:ids)
+        ORDER BY vdl.id_venta_detalle
+        """, nativeQuery = true)
+    List<VentaItemLoteProjection> lotesDeItems(@Param("ids") List<Long> ids);
+
 }

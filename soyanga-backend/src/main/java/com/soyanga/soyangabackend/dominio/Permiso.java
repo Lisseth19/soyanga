@@ -25,4 +25,12 @@ public class Permiso {
 
     @Column(name = "descripcion")
     private String descripcion;
+
+    @Column(name = "estado_activo", nullable = false)
+    private Boolean estadoActivo = true; // default en Java, además del default en DB
+
+    @PrePersist
+    public void prePersist() {
+        if (estadoActivo == null) estadoActivo = true;
+    }
 }

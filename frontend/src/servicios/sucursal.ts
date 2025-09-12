@@ -7,10 +7,12 @@ import type {
   SucursalFiltro,
 } from "@/types/sucursal";
 
+
 export interface OpcionIdNombre {
   id: number;
   nombre: string;
 }
+
 
 const BASE = "/api/v1/catalogo/sucursales";
 

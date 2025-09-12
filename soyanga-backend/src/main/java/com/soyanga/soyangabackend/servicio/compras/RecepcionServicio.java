@@ -95,8 +95,7 @@ public class RecepcionServicio {
             final Long idAlmacen = dto.getIdAlmacen();
             final Long idLote = lote.getIdLote();
 
-            var exOpt = existenciaRepo.findByIdAlmacenAndIdLote(idAlmacen, idLote);
-
+            var exOpt = existenciaRepo.lockByAlmacenAndIdLote(idAlmacen, idLote);
             ExistenciaPorLote ex = exOpt.orElseGet(() -> ExistenciaPorLote.builder()
                     .idAlmacen(idAlmacen)
                     .idLote(idLote)
@@ -104,11 +103,6 @@ public class RecepcionServicio {
                     .cantidadReservada(BigDecimal.ZERO)
                     .stockMinimo(BigDecimal.ZERO)
                     .build());
-
-            ex.setCantidadDisponible(ex.getCantidadDisponible().add(it.getCantidadRecibida()));
-            ex.setFechaUltimaActualizacion(java.time.LocalDateTime.now());
-            ex = existenciaRepo.save(ex);
-
 
             ex.setCantidadDisponible(ex.getCantidadDisponible().add(it.getCantidadRecibida()));
             ex.setFechaUltimaActualizacion(LocalDateTime.now());
