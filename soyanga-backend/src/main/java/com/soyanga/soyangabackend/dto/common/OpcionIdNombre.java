@@ -1,6 +1,15 @@
 package com.soyanga.soyangabackend.dto.common;
 
-public interface OpcionIdNombre {
-    Long getId();
-    String getNombre();
-}
+import lombok.*;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public class OpcionIdNombre {
+        private Long id;
+        private String nombre;
+    }
+
+
