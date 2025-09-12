@@ -1,0 +1,343 @@
+import { useEffect, useMemo, useState } from "react";
+import { almacenService } from "@/servicios/almacen";
+import { sucursalService } from "@/servicios/sucursal";
+import type { Page } from "@/types/pagination";
+import type { Almacen, AlmacenCrear, AlmacenActualizar } from "@/types/almacen";
+
+type Opcion = { id: number; nombre: string };
+
+export default function AlmacenesPage() {
+  // ---- list state
+  const [page, setPage] = useState<Page<Almacen> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  // ---- filtros
+  const [q, setQ] = useState("");
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
+
+  // ---- sucursal opciones
+  const [sucursales, setSucursales] = useState<Opcion[]>([]);
+  const [cargandoSuc, setCargandoSuc] = useState(false);
+
+  // ---- form (agregar/editar en la misma página)
+  const [editando, setEditando] = useState<Almacen | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [form, setForm] = useState<AlmacenCrear>({
+    idSucursal: 0,
+    nombreAlmacen: "",
+    descripcion: "",
+    estadoActivo: true,
+  });
+
+  // helpers UI
+  const tituloForm = useMemo(
+    () => (editando ? "Editar Almacén" : "Agregar Nuevo Almacén"),
+    [editando]
+  );
+  const textoBoton = useMemo(() => (editando ? "Guardar Cambios" : "Agregar Almacén"), [editando]);
+
+  // cargar sucursales para el combo
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setCargandoSuc(true);
+        const opts = await sucursalService.opciones();
+        setSucursales(opts);
+      } catch {
+        // silencioso; si falla, el select quedará vacío
+      } finally {
+        setCargandoSuc(false);
+      }
+    };
+    load();
+  }, []);
+
+  async function fetchList() {
+    setLoading(true);
+    setErr(null);
+    try {
+      const p = await almacenService.list({
+        q: q.trim() || undefined,
+        incluirInactivos: mostrarInactivos || undefined,
+        page: 0,
+        size: 10,
+        sort: "nombreAlmacen,asc",
+      });
+      setPage(p);
+    } catch (e: any) {
+      setErr(e?.message || "Error cargando almacenes");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, mostrarInactivos]);
+
+  // acciones de tabla
+  async function onToggleActivo(a: Almacen) {
+    try {
+      await almacenService.toggleActivo(a.idAlmacen, !a.estadoActivo);
+      await fetchList();
+      if (editando?.idAlmacen === a.idAlmacen) {
+        setEditando({ ...a, estadoActivo: !a.estadoActivo });
+        setForm((f) => ({ ...f, estadoActivo: !a.estadoActivo }));
+      }
+    } catch (e: any) {
+      alert(e?.message || "No se pudo cambiar el estado");
+    }
+  }
+
+  async function onDelete(a: Almacen) {
+    const ok = confirm(`¿Eliminar el almacén "${a.nombreAlmacen}"?`);
+    if (!ok) return;
+    try {
+      await almacenService.remove(a.idAlmacen);
+      await fetchList();
+      if (editando?.idAlmacen === a.idAlmacen) {
+        onCancelar();
+      }
+    } catch (e: any) {
+      alert(e?.message || "No se pudo eliminar");
+    }
+  }
+
+  function onEditar(a: Almacen) {
+    setEditando(a);
+    setForm({
+      idSucursal: a.idSucursal,
+      nombreAlmacen: a.nombreAlmacen,
+      descripcion: a.descripcion || "",
+      estadoActivo: a.estadoActivo,
+    });
+  }
+
+  function onCancelar() {
+    setEditando(null);
+    setForm({
+      idSucursal: 0,
+      nombreAlmacen: "",
+      descripcion: "",
+      estadoActivo: true,
+    });
+  }
+
+  // guardar (crear/actualizar)
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.idSucursal || !form.nombreAlmacen.trim()) {
+      alert("Selecciona sucursal y escribe un nombre.");
+      return;
+    }
+    setGuardando(true);
+    try {
+      if (editando) {
+        const dto: AlmacenActualizar = {
+          idSucursal: form.idSucursal,
+          nombreAlmacen: form.nombreAlmacen.trim(),
+          descripcion: form.descripcion?.trim() || "",
+          estadoActivo: !!form.estadoActivo,
+        };
+        await almacenService.update(editando.idAlmacen, dto);
+      } else {
+        const dto: AlmacenCrear = {
+          idSucursal: form.idSucursal,
+          nombreAlmacen: form.nombreAlmacen.trim(),
+          descripcion: form.descripcion?.trim() || "",
+          estadoActivo: !!form.estadoActivo,
+        };
+        await almacenService.create(dto);
+      }
+      await fetchList();
+      onCancelar();
+    } catch (e: any) {
+      alert(e?.message || "No se pudo guardar");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  // iconos mínimos
+  const SearchIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" className="text-neutral-400">
+      <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.71.71l.27.28v.79L20 21.49 21.49 20 15.5 14zM10 15a5 5 0 110-10 5 5 0 010 10z" fill="currentColor" />
+    </svg>
+  );
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-semibold mb-4">Gestión de Almacenes</h1>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Columna izquierda: filtros + tabla (ocupa 2/3) */}
+        <div className="lg:col-span-2">
+          {/* Filtros */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="accent-emerald-600"
+                checked={mostrarInactivos}
+                onChange={(e) => setMostrarInactivos(e.target.checked)}
+              />
+              <span className="text-sm text-neutral-700">Mostrar almacenes inactivos</span>
+            </label>
+
+            <div className="relative w-full sm:w-80">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2">
+                <SearchIcon />
+              </span>
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar almacén…"
+                className="h-10 w-full pl-9 pr-3 rounded-lg border border-neutral-300"
+              />
+            </div>
+          </div>
+
+          {/* Tabla */}
+          {err && <div className="text-red-600 mb-3">Error: {err}</div>}
+          {loading && !err && <div className="mb-3">Cargando…</div>}
+
+          {!loading && !err && (
+            <div className="border rounded-xl overflow-hidden bg-white">
+              <table className="min-w-full text-sm">
+                <thead className="bg-neutral-50">
+                  <tr className="text-neutral-600 uppercase text-xs tracking-wider">
+                    <th className="text-left px-4 py-3">Almacén</th>
+                    <th className="text-left px-4 py-3">Sucursal</th>
+                    <th className="text-left px-4 py-3">Descripción</th>
+                    <th className="text-left px-4 py-3">Estado</th>
+                    <th className="text-left px-4 py-3 w-44">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {page?.content?.length ? (
+                    page.content.map((a) => (
+                      <tr key={a.idAlmacen} className="border-t hover:bg-neutral-50/60">
+                        <td className="px-4 py-3 font-semibold">{a.nombreAlmacen}</td>
+                        <td className="px-4 py-3">
+                          {sucursales.find((s) => s.id === a.idSucursal)?.nombre || a.idSucursal}
+                        </td>
+                        <td className="px-4 py-3">{a.descripcion || "—"}</td>
+                        <td className="px-4 py-3">{a.estadoActivo ? "Activo" : "Inactivo"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <button
+                              className="text-neutral-700 hover:text-neutral-900"
+                              onClick={() => onEditar(a)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              className={a.estadoActivo ? "text-orange-600 hover:text-orange-700" : "text-emerald-600 hover:text-emerald-700"}
+                              onClick={() => onToggleActivo(a)}
+                            >
+                              {a.estadoActivo ? "Desactivar" : "Reactivar"}
+                            </button>
+                            <button
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => onDelete(a)}
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="text-center px-4 py-8 text-neutral-500">
+                        Sin registros
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Columna derecha: formulario (1/3) */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-4">
+            <div className="bg-white border rounded-xl p-4">
+              <h2 className="text-lg font-semibold mb-2">{tituloForm}</h2>
+              <form className="space-y-3" onSubmit={onSubmit}>
+                <div>
+                  <label className="block text-sm text-neutral-700 mb-1">Sucursal</label>
+                  <select
+                    className="w-full border rounded-lg px-3 py-2"
+                    value={form.idSucursal}
+                    onChange={(e) => setForm((f) => ({ ...f, idSucursal: Number(e.target.value) }))}
+                    disabled={cargandoSuc}
+                  >
+                    <option value={0} disabled>Selecciona una sucursal…</option>
+                    {sucursales.map((s) => (
+                      <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-neutral-700 mb-1">Nombre</label>
+                  <input
+                    className="w-full border rounded-lg px-3 py-2"
+                    value={form.nombreAlmacen}
+                    onChange={(e) => setForm((f) => ({ ...f, nombreAlmacen: e.target.value }))}
+                    placeholder="p. ej., Almacén Central"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-neutral-700 mb-1">Descripción</label>
+                  <textarea
+                    className="w-full border rounded-lg px-3 py-2 min-h-[80px]"
+                    value={form.descripcion || ""}
+                    onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+                    placeholder="Opcional"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-neutral-700 mb-1">Estado</label>
+                  <select
+                    className="w-full border rounded-lg px-3 py-2"
+                    value={form.estadoActivo ? "si" : "no"}
+                    onChange={(e) => setForm((f) => ({ ...f, estadoActivo: e.target.value === "si" }))}
+                  >
+                    <option value="si">Activo</option>
+                    <option value="no">Inactivo</option>
+                  </select>
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={guardando}
+                    className="flex-1 h-10 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {textoBoton}
+                  </button>
+                  {editando && (
+                    <button
+                      type="button"
+                      className="h-10 px-4 rounded-lg border border-neutral-300 hover:bg-neutral-50"
+                      onClick={onCancelar}
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
