@@ -1,31 +1,27 @@
-package com.soyanga.soyangabackend.servicio.inventario.impl;
+package com.soyanga.soyangabackend.servicio.inventario;
 
 import com.soyanga.soyangabackend.dto.inventario.InventarioPorLoteResponse;
 import com.soyanga.soyangabackend.repositorio.inventario.InventarioPorLoteRepositorio;
-import com.soyanga.soyangabackend.servicio.inventario.InventarioPorLoteServicio;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
-public class InventarioPorLoteServicioImpl implements InventarioPorLoteServicio {
+public class InventarioLotesConsultaServicio {
 
-    private final InventarioPorLoteRepositorio repositorio;
+    private final InventarioPorLoteRepositorio repo;
 
-    @Override
     public Page<InventarioPorLoteResponse> listar(Long almacenId,
                                                   String textoProductoOSku,
                                                   LocalDate venceAntes,
                                                   Pageable pageable) {
 
-        final java.sql.Date venceAntesSql =
-                (venceAntes == null) ? null : java.sql.Date.valueOf(venceAntes);
+        String q = (textoProductoOSku == null || textoProductoOSku.isBlank()) ? null : textoProductoOSku.trim();
 
-        return repositorio.buscar(almacenId, textoProductoOSku, venceAntesSql, pageable)
+        return repo.buscar(almacenId, q, venceAntes, pageable)
                 .map(v -> InventarioPorLoteResponse.builder()
                         .almacenId(v.getIdAlmacen())
                         .almacen(v.getAlmacen())
@@ -38,7 +34,6 @@ public class InventarioPorLoteServicioImpl implements InventarioPorLoteServicio 
                         .reservado(v.getReservado())
                         .vencimiento(v.getVencimiento())
                         .stockMinimo(v.getStockMinimo())
-                        .build()
-                );
+                        .build());
     }
 }

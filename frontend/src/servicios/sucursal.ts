@@ -7,7 +7,7 @@ import type {
   SucursalFiltro,
 } from "@/types/sucursal";
 
-const BASE = "/api/v1/sucursales";
+const BASE = "/api/v1/catalogo/sucursales";
 
 /** Convierte un objeto de filtros a params limpios (Record<string, unknown>) */
 function toParams(obj: SucursalFiltro): Record<string, unknown> {

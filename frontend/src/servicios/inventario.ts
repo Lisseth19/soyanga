@@ -43,7 +43,7 @@ function clean<T extends Record<string, unknown>>(params: T): T {
   return out;
 }
 export async function getInventarioPorLote(params: InventarioQuery = {}) {
-  return http.get<Page<InventarioPorLoteItem>>("/api/v1/inventario/por-lote", {
+  return http.get<Page<InventarioPorLoteItem>>("/api/v1/inventario/lotes", {
     params: clean(params),
   });
 }
