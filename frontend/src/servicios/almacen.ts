@@ -2,7 +2,7 @@ import { http } from "@/servicios/httpClient"; // o donde lo tengas
 import type { Page } from "@/types/pagination";
 import type { Almacen, AlmacenCrear, AlmacenActualizar } from "@/types/almacen";
 
-const base = "/api/v1/almacenes";
+const base = "/v1/catalogo/almacenes";
 
 export const almacenService = {
   async list(params: {

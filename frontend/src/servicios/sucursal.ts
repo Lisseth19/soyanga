@@ -14,7 +14,7 @@ export interface OpcionIdNombre {
 }
 
 
-const BASE = "/api/v1/catalogo/sucursales";
+const BASE = "/v1/catalogo/sucursales";
 
 /** Convierte un objeto de filtros a params limpios (Record<string, unknown>) */
 function toParams(obj: SucursalFiltro): Record<string, unknown> {

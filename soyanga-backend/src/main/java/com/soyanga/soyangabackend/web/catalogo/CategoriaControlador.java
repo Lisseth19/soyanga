@@ -1,12 +1,15 @@
 package com.soyanga.soyangabackend.web.catalogo;
 
 import com.soyanga.soyangabackend.dto.catalogo.*;
+import com.soyanga.soyangabackend.dto.common.OpcionIdNombre;
 import com.soyanga.soyangabackend.servicio.catalogo.CategoriaServicio;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/catalogo/categorias")
@@ -15,17 +18,28 @@ public class CategoriaControlador {
 
     private final CategoriaServicio servicio;
 
+    // LISTAR: ahora admite idCategoriaPadre y soloRaices
     @GetMapping
     public Page<CategoriaDTO> listar(@RequestParam(required = false) String q,
-                                     @RequestParam(defaultValue = "0") int page,
-                                     @RequestParam(defaultValue = "20") int size,
-                                     @RequestParam(defaultValue = "nombreCategoria,asc") String sort) {
+            @RequestParam(required = false) Long idCategoriaPadre,
+            @RequestParam(defaultValue = "false") boolean soloRaices,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "nombreCategoria,asc") String sort) {
         Sort s = parseSort(sort, "nombreCategoria");
         Pageable pageable = PageRequest.of(page, size, s);
-        return servicio.buscar(q, pageable);
+        return servicio.buscar(q, idCategoriaPadre, soloRaices, pageable);
     }
 
-    @GetMapping("/{id}")
+    // NUEVO: /opciones (debe ir ANTES de /{id})
+    @GetMapping("/opciones")
+    public List<OpcionIdNombre> opciones(@RequestParam(required = false) String q,
+            @RequestParam(required = false) Long idCategoriaPadre) {
+        return servicio.opciones(q, idCategoriaPadre);
+    }
+
+    // Restringe {id} a solo dígitos para no capturar "/opciones"
+    @GetMapping("/{id:\\d+}")
     public CategoriaDTO obtener(@PathVariable Long id) {
         return servicio.obtener(id);
     }
@@ -36,19 +50,20 @@ public class CategoriaControlador {
         return servicio.crear(dto);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:\\d+}")
     public CategoriaDTO actualizar(@PathVariable Long id, @RequestBody CategoriaActualizarDTO dto) {
         return servicio.actualizar(id, dto);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:\\d+}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void eliminar(@PathVariable Long id) {
         servicio.eliminar(id);
     }
 
     private Sort parseSort(String sort, String fallback) {
-        if (sort == null || sort.isBlank()) return Sort.by(fallback).ascending();
+        if (sort == null || sort.isBlank())
+            return Sort.by(fallback).ascending();
         String[] parts = sort.split(",", 2);
         String field = parts[0].trim().isEmpty() ? fallback : parts[0].trim();
         boolean desc = parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc");

@@ -7,7 +7,7 @@ export interface OpcionIdNombre {
 
 export async function getAlmacenesOpciones(activos = true) {
   return http.get<OpcionIdNombre[]>(
-    "/api/v1/almacenes/opciones",
+    "/v1/almacenes/opciones",
     { params: { activos } }
   );
 }
