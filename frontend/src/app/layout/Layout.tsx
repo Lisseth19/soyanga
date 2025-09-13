@@ -29,7 +29,12 @@ export default function AppLayout() {
             <NavLink to="/sucursales" className={navClass}>
               Sucursales
             </NavLink>
-              <NavLink to="/catalogo/almacenes" className={navClass}>Almacenes</NavLink>
+            <NavLink to="/catalogo/almacenes" className={navClass}>
+              Almacenes
+            </NavLink>
+            <NavLink to="/catalogo/categorias" className={navClass}>
+              Categorias
+            </NavLink>
             <NavLink to="/salud" className={navClass}>
               API Health
             </NavLink>

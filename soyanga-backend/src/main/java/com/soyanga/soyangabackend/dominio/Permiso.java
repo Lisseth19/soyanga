@@ -4,13 +4,14 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(
-        name = "permisos",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_permisos_nombre", columnNames = {"nombre_permiso"})
-        }
-)
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Table(name = "permisos", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_permisos_nombre", columnNames = { "nombre_permiso" })
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Permiso {
 
@@ -31,6 +32,7 @@ public class Permiso {
 
     @PrePersist
     public void prePersist() {
-        if (estadoActivo == null) estadoActivo = true;
+        if (estadoActivo == null)
+            estadoActivo = true;
     }
 }

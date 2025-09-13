@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
+import com.soyanga.soyangabackend.dto.common.EstadoRequest;
 import java.util.List;
 
 @RestController
@@ -25,12 +25,20 @@ public class AlmacenControlador {
     public Page<AlmacenListadoProjection> listar(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Long idSucursal,
-            @RequestParam(defaultValue = "false") boolean soloActivos,
+            // nuevo nombre (checkbox "Mostrar inactivos")
+            @RequestParam(required = false) Boolean incluirInactivos,
+            // compat temporal con el viejo nombre (inverso)
+            @RequestParam(required = false) Boolean soloActivos,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        var pageable = PageRequest.of(page, size); // el ORDER BY está en el SQL nativo
-        return servicio.listar(q, idSucursal, soloActivos, pageable);
+            @RequestParam(defaultValue = "20") int size) {
+
+        // Regla: default = false (NO incluir inactivos) => solo activos
+        boolean incluir = (incluirInactivos != null)
+                ? incluirInactivos
+                : (soloActivos != null ? !soloActivos : false);
+
+        var pageable = PageRequest.of(page, size);
+        return servicio.listar(q, idSucursal, incluir, pageable);
     }
 
     @GetMapping("/{id}")
@@ -57,9 +65,22 @@ public class AlmacenControlador {
 
     @GetMapping("/opciones")
     public List<OpcionIdNombre> opciones(
-            @RequestParam(defaultValue = "false") boolean soloActivos,
-            @RequestParam(required = false) Long idSucursal
-    ) {
-        return servicio.opciones(soloActivos, idSucursal);
+            @RequestParam(required = false) Boolean incluirInactivos,
+            @RequestParam(required = false) Boolean soloActivos,
+            @RequestParam(required = false) Long idSucursal) {
+
+        boolean incluir = (incluirInactivos != null)
+                ? incluirInactivos
+                : (soloActivos != null ? !soloActivos : false);
+
+        return servicio.opciones(incluir, idSucursal);
+    }
+
+    @PatchMapping("/{id}/estado")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cambiarEstado(@PathVariable Long id, @RequestBody EstadoRequest req) {
+        // Si no viene nada, asumimos false para evitar NPE
+        boolean activo = Boolean.TRUE.equals(req.activo());
+        servicio.cambiarEstado(id, activo);
     }
 }

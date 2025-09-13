@@ -64,15 +64,31 @@ function sleep(ms: number) {
 }
 
 function buildUrl(path: string, params?: Record<string, unknown>): string {
-  const url = new URL(path, BASE_URL);
+  // Normaliza el path
+  const p = path.startsWith("/") ? path : `/${path}`;
+
+  let url: URL;
+
+  if (/^https?:\/\//i.test(BASE_URL)) {
+    // BASE_URL absoluta (ej. http://192.168.2.110:8084 o http://localhost:8084)
+    url = new URL(p, BASE_URL);
+  } else {
+    // BASE_URL relativa (ej. /api para proxy de Vite)
+    const base = (BASE_URL || "").replace(/\/+$/, ""); // quita barra final
+    const full = `${base}${p}`;                        // -> /api + /v1/... = /api/v1/...
+    url = new URL(full, window.location.origin);       // usa el origin actual como base absoluta
+  }
+
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
       if (v === undefined || v === null || v === "") return;
       url.searchParams.append(k, String(v));
     });
   }
+
   return url.toString();
 }
+
 
 function mergeSignals(signalA?: AbortSignal, signalB?: AbortSignal): AbortSignal | undefined {
   if (!signalA) return signalB;
@@ -94,6 +110,8 @@ async function coreFetch<T, B = unknown>(path: string, options: HttpOptions<B> =
 
   // Construye URL
   const url = buildUrl(path, options.params);
+
+  console.debug('HTTP', (options.method ?? 'GET'), '→', url);
 
   // AbortController para timeout + soporte de cancelación externa
   const timeoutController = new AbortController();
@@ -211,4 +229,5 @@ export const http = {
     coreFetch<T, B>(path, { ...opts, method: "PATCH", body }),
   del:  <T>(path: string, opts: Omit<HttpOptions, "method" | "body"> = {}) =>
     coreFetch<T>(path, { ...opts, method: "DELETE" }),
+
 };
