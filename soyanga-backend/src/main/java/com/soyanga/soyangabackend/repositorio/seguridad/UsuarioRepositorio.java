@@ -7,7 +7,6 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioRepositorio extends BaseRepository<Usuario, Long> {
@@ -44,24 +43,4 @@ public interface UsuarioRepositorio extends BaseRepository<Usuario, Long> {
     Page<UsuarioListadoProjection> listar(@Param("q") String q,
                                           @Param("soloActivos") boolean soloActivos,
                                           Pageable pageable);
-
-
-    @Query(value = """
-        SELECT r.nombre_rol
-        FROM roles r
-        JOIN usuarios_roles ur ON ur.id_rol = r.id_rol
-        WHERE ur.id_usuario = :idUsuario
-          AND (r.estado_activo IS NULL OR r.estado_activo = TRUE)
-        """, nativeQuery = true)
-    List<String> rolesDeUsuario(@Param("idUsuario") Long idUsuario);
-
-    @Query(value = """
-        SELECT p.nombre_permiso
-        FROM permisos p
-        JOIN roles_permisos rp ON rp.id_permiso = p.id_permiso
-        JOIN usuarios_roles ur ON ur.id_rol = rp.id_rol
-        WHERE ur.id_usuario = :idUsuario
-          AND (p.estado_activo IS NULL OR p.estado_activo = TRUE)
-        """, nativeQuery = true)
-    List<String> permisosDeUsuario(@Param("idUsuario") Long idUsuario);
 }
