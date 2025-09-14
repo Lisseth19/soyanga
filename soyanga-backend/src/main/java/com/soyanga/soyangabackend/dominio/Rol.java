@@ -25,4 +25,7 @@ public class Rol {
 
     @Column(name = "descripcion")
     private String descripcion;
+
+    @Column(name = "estado_activo", nullable = false)
+    private Boolean estadoActivo = true; // default
 }

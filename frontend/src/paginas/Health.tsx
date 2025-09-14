@@ -1,4 +1,3 @@
-// src/paginas/Health.tsx
 import { useEffect, useState } from "react";
 import { http, ApiError } from "@/servicios/httpClient";
 
