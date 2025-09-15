@@ -8,6 +8,7 @@ import NuevaSucursal from "@/paginas/sucursales/NuevaSucursal";
 import EditarSucursal from "@/paginas/sucursales/EditarSucursal";
 import AlmacenesPage from '@/paginas/almacenes/almacen'
 import CategoriasPage from '@/paginas/categorias/Categorias'
+import MonedasPage from '@/paginas/moneda/Monedas';
 
 export const router = createBrowserRouter([
     {
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
             { path: "/sucursales/:id", element: <EditarSucursal /> },
             { path: '/catalogo/almacenes', element: <AlmacenesPage /> },
             { path: '/catalogo/categorias', element: <CategoriasPage /> },
+            { path: '/catalogo/monedas', element: <MonedasPage /> },
         ],
     },
 ])
