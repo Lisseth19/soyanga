@@ -15,7 +15,8 @@ public class MovimientoInventarioConsultaServicio {
 
     public List<MovimientoInventarioResponse> ultimos(Long loteId, Long almacenId, int limit) {
         int lim = (limit <= 0 || limit > 200) ? 50 : limit;
-        return repo.ultimos(loteId, almacenId, lim).stream()
+
+        return repo.ultimosConNombres(loteId, almacenId, lim).stream()
                 .map(r -> MovimientoInventarioResponse.builder()
                         .idMovimiento(r.getIdMovimiento())
                         .fechaMovimiento(r.getFechaMovimiento())
@@ -26,6 +27,8 @@ public class MovimientoInventarioConsultaServicio {
                         .idAlmacenDestino(r.getIdAlmacenDestino())
                         .referenciaModulo(r.getReferenciaModulo())
                         .idReferencia(r.getIdReferencia())
+                        .almacenOrigen(r.getAlmacenOrigen())     // <- nombres
+                        .almacenDestino(r.getAlmacenDestino())   // <- nombres
                         .build())
                 .toList();
     }

@@ -12,7 +12,7 @@ export default function Health() {
 
   useEffect(() => {
     http
-      .get<HealthResp>("/api/health")
+      .get<HealthResp>("/health")
       .then(setData)
       .catch((e: unknown) => {
         const msg =

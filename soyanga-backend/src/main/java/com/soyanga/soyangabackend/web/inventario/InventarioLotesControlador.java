@@ -7,6 +7,7 @@ import org.springframework.data.domain.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping("/api/v1/inventario/lotes")
@@ -19,7 +20,8 @@ public class InventarioLotesControlador {
     public Page<InventarioPorLoteResponse> listar(
             @RequestParam(required = false) Long almacenId,
             @RequestParam(required = false, name = "q") String textoProductoOSku,
-            @RequestParam(required = false) LocalDate venceAntes,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate venceAntes,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {

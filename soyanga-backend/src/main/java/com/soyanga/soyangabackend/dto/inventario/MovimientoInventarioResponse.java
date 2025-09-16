@@ -1,22 +1,30 @@
 package com.soyanga.soyangabackend.dto.inventario;
 
+import lombok.Builder;
+import lombok.Value;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@lombok.Value
-@lombok.Builder
+@Value
+@Builder
 public class MovimientoInventarioResponse {
-    Long idMovimiento;          // agregado
+    Long idMovimiento;
     LocalDateTime fechaMovimiento;
     String tipoMovimiento;
-    Long idLote;                // agregado
+    Long idLote;
     BigDecimal cantidad;
-    Long idAlmacenOrigen;       // agregado
-    Long idAlmacenDestino;      // agregado
+
+    Long idAlmacenOrigen;
+    Long idAlmacenDestino;
+
     String referenciaModulo;
     Long idReferencia;
+
+    // NUEVOS: nombres resueltos
+    String almacenOrigen;
+    String almacenDestino;
+
+    // opcional
     String observaciones;
-    // Si además quieres nombres de almacén, déjalos como opcionales:
-    String almacenOrigen;       // opcional (nombre)
-    String almacenDestino;      // opcional (nombre)
 }

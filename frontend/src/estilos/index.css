@@ -25,3 +25,32 @@ body { /* Tema claro por defecto */
 }
 
 pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace }
+/* Oculta el icono nativo del datepicker SOLO cuando el input tenga esta clase */
+.input-date-no-indicator::-webkit-calendar-picker-indicator {
+  display: none !important;     /* quita el ícono nativo */
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* Asegura que siga usando el datepicker nativo para teclado/validación */
+input[type="date"] { appearance:auto; }
+
+/* Oculta barras de scroll pero mantiene el desplazamiento */
+.no-scrollbar {
+  -ms-overflow-style: none;    /* IE y Edge */
+  scrollbar-width: none;       /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar { /* Chrome, Safari */
+  display: none;
+}
+/* Ocultar la barra de scroll del documento pero permitir el desplazamiento */
+html, body {
+  overflow-y: auto;         /* ← el scroll SIGUE activo */
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {   /* Chrome/Safari/Opera */
+  display: none;
+}
+
