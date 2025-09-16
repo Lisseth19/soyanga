@@ -16,16 +16,18 @@ public class ProductoControlador {
 
     private final ProductoServicio productoServicio;
 
-    // GET /api/v1/catalogo/productos?q=...&page=0&size=20&sort=nombreProducto,asc
+    // GET
+    // /api/v1/catalogo/productos?q=...&idCategoria=...&soloActivos=...&page=0&size=20&sort=nombreProducto,asc
     @GetMapping
     public Page<ProductoDTO> listar(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long idCategoria, // CAMBIO: nuevo filtro
+            @RequestParam(defaultValue = "false") boolean soloActivos, // CAMBIO: nuevo filtro
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "nombreProducto,asc") String sort
-    ) {
+            @RequestParam(defaultValue = "nombreProducto,asc") String sort) {
         Pageable pageable = PageRequest.of(page, size, parseSort(sort));
-        return productoServicio.buscar(q, pageable);
+        return productoServicio.buscar(q, idCategoria, soloActivos, pageable); // CAMBIO
     }
 
     @GetMapping("/{id}")
@@ -52,7 +54,8 @@ public class ProductoControlador {
     }
 
     private Sort parseSort(String sort) {
-        if (sort == null || sort.isBlank()) return Sort.by("nombreProducto").ascending();
+        if (sort == null || sort.isBlank())
+            return Sort.by("nombreProducto").ascending();
         String[] parts = sort.split(",", 2);
         String field = parts[0].trim().isEmpty() ? "nombreProducto" : parts[0].trim();
         boolean desc = parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc");
