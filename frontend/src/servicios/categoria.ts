@@ -23,6 +23,14 @@ function sanitizeParams(params: Record<string, unknown>) {
   return p;
 }
 
+// Opciones para combos/autocomplete
+export function opcionesCategoria(q?: string, idCategoriaPadre?: number) {
+  return http.get<Array<{ id: number; nombre: string }>>(
+    `${base}/opciones`,
+    { params: { q, idCategoriaPadre } }
+  );
+}
+
 export const categoriaService = {
   // GET /v1/catalogo/categorias
   async list(params: {
