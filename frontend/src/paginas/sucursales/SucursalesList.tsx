@@ -15,6 +15,7 @@ export default function SucursalesList() {
   // filtro de búsqueda (sin ordenar)
   const [q, setQ] = useState(sp.get("q") ?? "");
 
+  // @ts-ignore
   async function fetchList(signal?: AbortSignal) {
     setLoading(true);
     setErr(null);
