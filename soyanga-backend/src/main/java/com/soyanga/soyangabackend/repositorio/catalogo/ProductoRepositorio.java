@@ -5,12 +5,26 @@ import com.soyanga.soyangabackend.repositorio.BaseRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ProductoRepositorio extends BaseRepository<Producto, Long> {
 
-    @Query("""
-       SELECT p FROM Producto p
-       WHERE (:q IS NULL OR LOWER(p.nombreProducto) LIKE CONCAT('%', LOWER(:q), '%'))
-       """)
-    Page<Producto> buscar(String q, Pageable pageable);
+  /**
+   * Búsqueda con patrón ya construido (ej. "%abc%") para evitar "text ~~ bytea".
+   * No usamos concat ni ||, solo LIKE :pat.
+   */
+  @Query("""
+      select p from Producto p
+      where (:pat is null or
+             lower(p.nombreProducto)           like :pat or
+             lower(coalesce(p.descripcion, '')) like :pat or
+             lower(coalesce(p.principioActivo, '')) like :pat or
+             lower(coalesce(p.registroSanitario, '')) like :pat)
+        and (:idCategoria is null or p.idCategoria = :idCategoria)
+        and (:soloActivos = false or p.estadoActivo = true)
+      """)
+  Page<Producto> buscar(@Param("pat") String pat,
+      @Param("idCategoria") Long idCategoria,
+      @Param("soloActivos") boolean soloActivos,
+      Pageable pageable);
 }

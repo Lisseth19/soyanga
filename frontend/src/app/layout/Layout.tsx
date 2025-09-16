@@ -37,6 +37,8 @@ export default function AppLayout() {
             </NavLink>
             <NavLink to="/catalogo/monedas" className={navClass}>
               Monedas
+              <NavLink to="/inventario/productos" className={navClass}>
+              Productos
             </NavLink>
             <NavLink to="/salud" className={navClass}>
               API Health

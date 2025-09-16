@@ -4,6 +4,9 @@ import com.soyanga.soyangabackend.dominio.Producto;
 import com.soyanga.soyangabackend.dto.catalogo.*;
 import com.soyanga.soyangabackend.repositorio.catalogo.ProductoRepositorio;
 import lombok.RequiredArgsConstructor;
+
+import java.util.Locale;
+
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +17,13 @@ public class ProductoServicio {
 
     private final ProductoRepositorio productoRepositorio;
 
-    // Búsqueda paginada por nombre (LIKE) — ya tienes el método buscar en el repo
-    public Page<ProductoDTO> buscar(String q, Pageable pageable) {
-        var page = productoRepositorio.buscar(q == null || q.isBlank() ? null : q.trim(), pageable);
-        return page.map(this::toDTO);
+    // Construye el patrón "%q%" en minúsculas y lo pasa como :pat
+    public Page<ProductoDTO> buscar(String q, Long idCategoria, boolean soloActivos, Pageable pageable) {
+        String pat = (q == null || q.isBlank())
+                ? null
+                : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+        return productoRepositorio.buscar(pat, idCategoria, soloActivos, pageable)
+                .map(this::toDTO);
     }
 
     public ProductoDTO obtener(Long id) {
@@ -51,12 +57,18 @@ public class ProductoServicio {
         var p = productoRepositorio.findById(id)
                 .orElseThrow(() -> new IllegalStateException("Producto no encontrado: " + id));
 
-        if (dto.getNombreProducto() != null) p.setNombreProducto(dto.getNombreProducto().trim());
-        if (dto.getDescripcion() != null) p.setDescripcion(dto.getDescripcion());
-        if (dto.getIdCategoria() != null) p.setIdCategoria(dto.getIdCategoria());
-        if (dto.getPrincipioActivo() != null) p.setPrincipioActivo(dto.getPrincipioActivo());
-        if (dto.getRegistroSanitario() != null) p.setRegistroSanitario(dto.getRegistroSanitario());
-        if (dto.getEstadoActivo() != null) p.setEstadoActivo(dto.getEstadoActivo());
+        if (dto.getNombreProducto() != null)
+            p.setNombreProducto(dto.getNombreProducto().trim());
+        if (dto.getDescripcion() != null)
+            p.setDescripcion(dto.getDescripcion());
+        if (dto.getIdCategoria() != null)
+            p.setIdCategoria(dto.getIdCategoria());
+        if (dto.getPrincipioActivo() != null)
+            p.setPrincipioActivo(dto.getPrincipioActivo());
+        if (dto.getRegistroSanitario() != null)
+            p.setRegistroSanitario(dto.getRegistroSanitario());
+        if (dto.getEstadoActivo() != null)
+            p.setEstadoActivo(dto.getEstadoActivo());
 
         p = productoRepositorio.save(p);
         return toDTO(p);

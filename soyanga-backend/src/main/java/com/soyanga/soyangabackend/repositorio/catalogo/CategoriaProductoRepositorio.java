@@ -12,23 +12,22 @@ import java.util.List;
 
 public interface CategoriaProductoRepositorio extends BaseRepository<CategoriaProducto, Long> {
 
-  // JPQL correcto contra la entidad CategoriaProducto.
-  // Compara LOWER(columna) con el parámetro ya minúsculo (qLower).
+  // IMPORTANTE: usar patrón preconstruido (:pat) para evitar "text ~~ bytea"
   @Query("""
       select c from CategoriaProducto c
-      where (:qLower is null or
-             lower(c.nombreCategoria) like concat('%', :qLower, '%') or
-             lower(coalesce(c.descripcion, '')) like concat('%', :qLower, '%'))
+      where (:pat is null or
+             lower(c.nombreCategoria) like :pat or
+             lower(coalesce(c.descripcion, '')) like :pat)
         and (:idPadre is null or c.idCategoriaPadre = :idPadre)
         and (:soloRaices = false or c.idCategoriaPadre is null)
       order by c.nombreCategoria
       """)
-  Page<CategoriaProducto> buscar(@Param("qLower") String qLower,
+  Page<CategoriaProducto> buscar(@Param("pat") String pat,
       @Param("idPadre") Long idPadre,
       @Param("soloRaices") boolean soloRaices,
       Pageable pageable);
 
-  // Opciones: opción B (nativa) con ILIKE + CAST para evitar problemas de tipos.
+  // Opciones para combos (nativa) — ya segura con ILIKE + CAST
   @Query(value = """
       SELECT c.id_categoria AS id, c.nombre_categoria AS nombre
       FROM categorias_de_productos c
@@ -37,5 +36,4 @@ public interface CategoriaProductoRepositorio extends BaseRepository<CategoriaPr
       ORDER BY c.nombre_categoria ASC
       """, nativeQuery = true)
   List<OpcionIdNombre> opciones(@Param("q") String q, @Param("idPadre") Long idPadre);
-
 }

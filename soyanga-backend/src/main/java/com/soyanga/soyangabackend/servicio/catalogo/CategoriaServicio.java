@@ -19,17 +19,14 @@ public class CategoriaServicio {
     private final CategoriaProductoRepositorio repo;
 
     public Page<CategoriaDTO> buscar(String q, Long idPadre, boolean soloRaices, Pageable pageable) {
-        String qLower = (q == null || q.isBlank()) ? null : q.trim().toLowerCase(Locale.ROOT);
-        return repo.buscar(qLower, idPadre, soloRaices, pageable).map(this::toDTO);
+        // Construimos el patrón aquí (evita text~~bytea)
+        String pat = (q == null || q.isBlank())
+                ? null
+                : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+        return repo.buscar(pat, idPadre, soloRaices, pageable).map(this::toDTO);
     }
 
     public List<OpcionIdNombre> opciones(String q, Long idPadre) {
-        // // Si usas la opción A del repositorio:
-        // String qLower = (q == null || q.isBlank()) ? null :
-        // q.trim().toLowerCase(Locale.ROOT);
-        // return repo.opciones(qLower, idPadre);
-
-        // Si usas la opción B (ILIKE + CAST) en el repo, usa:
         String filtro = (q == null || q.isBlank()) ? null : q.trim();
         return repo.opciones(filtro, idPadre);
     }
