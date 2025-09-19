@@ -11,6 +11,8 @@ import CategoriasPage from '@/paginas/categorias/Categorias'
 import MonedasPage from '@/paginas/moneda/Monedas';
 import ProductosPage from '@/paginas/inventario/Productos'
 import ClientesPage from "@/paginas/cliente/Clientes.tsx";
+import ProveedoresPage from "@/paginas/proveedor/Proveedores";
+
 
 
 export const router = createBrowserRouter([
@@ -27,6 +29,7 @@ export const router = createBrowserRouter([
             { path: '/catalogo/categorias', element: <CategoriasPage /> },
             { path: '/catalogo/monedas', element: <MonedasPage /> },
             { path: "clientes", element: <ClientesPage /> },
+            { path: '/proveedores', element: <ProveedoresPage /> },
             { path: '/inventario/productos', element: <ProductosPage /> },
         ],
     },

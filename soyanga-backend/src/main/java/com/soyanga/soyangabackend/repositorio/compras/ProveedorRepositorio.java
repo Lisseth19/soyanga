@@ -18,6 +18,7 @@ public interface ProveedorRepositorio extends BaseRepository<Proveedor, Long> {
           p.contacto              AS contacto,
           p.telefono              AS telefono,
           p.correo_electronico    AS correoElectronico,
+          p.direccion      AS direccion,   -- 👈 incluir
           p.estado_activo         AS estadoActivo
         FROM proveedores p
         WHERE (:q IS NULL
