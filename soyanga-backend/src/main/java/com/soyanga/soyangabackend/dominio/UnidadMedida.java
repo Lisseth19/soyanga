@@ -7,7 +7,11 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "unidades_de_medida")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class UnidadMedida {
 

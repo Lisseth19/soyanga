@@ -5,13 +5,17 @@ import com.soyanga.soyangabackend.repositorio.BaseRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UnidadMedidaRepositorio extends BaseRepository<UnidadMedida, Long> {
 
     @Query("""
-       SELECT u FROM UnidadMedida u
-       WHERE (:q IS NULL OR LOWER(u.nombreUnidad) LIKE CONCAT('%', LOWER(:q), '%') OR LOWER(u.simboloUnidad) LIKE CONCAT('%', LOWER(:q), '%'))
-       """)
-    Page<UnidadMedida> buscar(String q, Pageable pageable);
-
+                select u
+                from UnidadMedida u
+                where (:pat is null
+                       or lower(u.nombreUnidad)  like :pat
+                       or lower(u.simboloUnidad) like :pat)
+                order by u.nombreUnidad
+            """)
+    Page<UnidadMedida> buscar(@Param("pat") String pat, Pageable pageable);
 }

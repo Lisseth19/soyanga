@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { crearProducto, actualizarProducto, desactivarProducto } from "@/servicios/producto";
 import type { ProductoDTO } from "@/types/producto";
 import { opcionesCategoria } from "@/servicios/categoria";
+// arriba, junto a otros imports
+import { presentacionService } from "@/servicios/presentacion";
+
 
 type Mode = "create" | "edit";
 
@@ -55,6 +58,11 @@ export default function ProductoModal({ open, mode, producto, onClose, onSaved }
         registroSanitario: producto.registroSanitario ?? "",
         estadoActivo: !!producto.estadoActivo,
       });
+       // >>> NUEVO: verificar si tiene presentaciones
+    presentacionService
+      .list({ idProducto: producto.idProducto, page: 0, size: 1 })
+      .then((r) => setTienePres((r?.totalElements ?? 0) > 0))
+      .catch(() => setTienePres(false));
     } else if (!isEdit) {
       setForm({
         nombreProducto: "",
@@ -64,6 +72,7 @@ export default function ProductoModal({ open, mode, producto, onClose, onSaved }
         registroSanitario: "",
         estadoActivo: true,
       });
+      setTienePres(false); // en creación no aplica
     }
     setErrorMsg(null);
   }, [open, isEdit, producto]);
@@ -96,6 +105,16 @@ export default function ProductoModal({ open, mode, producto, onClose, onSaved }
     setErrorMsg(null);
     try {
       if (isEdit && producto) {
+
+         // >>> NUEVO: si intentan pasar de activo → inactivo y tiene presentaciones, bloquear
+      const desactivando = producto.estadoActivo && !form.estadoActivo;
+      if (desactivando && tienePres) {
+        setErrorMsg("No se puede desactivar este producto porque tiene presentaciones.");
+        setSaving(false);
+        return;
+      }
+
+
         const out = await actualizarProducto(producto.idProducto, {
           nombreProducto: form.nombreProducto.trim(),
           descripcion: form.descripcion.trim() || null,
@@ -126,6 +145,12 @@ export default function ProductoModal({ open, mode, producto, onClose, onSaved }
 
   const handleDelete = async () => {
     if (!producto) return;
+// >>> NUEVO: bloquear si tiene presentaciones
+  if (tienePres) {
+    setErrorMsg("No se puede desactivar este producto porque tiene presentaciones.");
+    return;
+  }
+
     if (!confirm("¿Desactivar este producto?")) return;
     setSaving(true);
     setErrorMsg(null);
@@ -140,6 +165,10 @@ export default function ProductoModal({ open, mode, producto, onClose, onSaved }
       setSaving(false);
     }
   };
+
+  // ¿El producto (en edición) tiene presentaciones?
+const [tienePres, setTienePres] = useState(false);
+
 
   if (!open) return null;
 
@@ -230,17 +259,7 @@ export default function ProductoModal({ open, mode, producto, onClose, onSaved }
           {errorMsg && <div className="text-red-600 text-sm">{errorMsg}</div>}
 
           <div className="flex items-center justify-end gap-2 pt-2">
-            {isEdit && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={saving}
-                className="px-3 py-2 border rounded text-red-600 border-red-300 hover:bg-red-50"
-                title="Desactiva (no borra físicamente)"
-              >
-                Desactivar
-              </button>
-            )}
+            
             <button
               type="button"
               onClick={onClose}
