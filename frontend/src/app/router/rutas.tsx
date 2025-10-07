@@ -10,8 +10,9 @@ import AlmacenesPage from '@/paginas/almacenes/almacen'
 import CategoriasPage from '@/paginas/categorias/Categorias'
 import MonedasPage from '@/paginas/moneda/Monedas';
 import ProductosPage from '@/paginas/inventario/Productos'
-import ClientesPage from "@/paginas/cliente/Clientes.tsx";
-import ProveedoresPage from "@/paginas/proveedor/Proveedores";
+
+import UnidadesPage from '@/paginas/catalogo/Unidades'
+import PresentacionesPage from '@/paginas/catalogo/Presentaciones'
 
 
 
@@ -31,6 +32,10 @@ export const router = createBrowserRouter([
             { path: "clientes", element: <ClientesPage /> },
             { path: '/proveedores', element: <ProveedoresPage /> },
             { path: '/inventario/productos', element: <ProductosPage /> },
+            { path: '/catalogo/unidades', element: <UnidadesPage /> },
+            // src/app/router/rutas.tsx
+            { path: "/catalogo/presentaciones", element: <PresentacionesPage /> },
+
         ],
     },
 ])

@@ -54,3 +54,8 @@ body::-webkit-scrollbar {   /* Chrome/Safari/Opera */
   display: none;
 }
 
+/* Oculta scrollbar en navegadores comunes */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+

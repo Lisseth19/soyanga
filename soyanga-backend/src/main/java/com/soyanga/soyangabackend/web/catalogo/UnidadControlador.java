@@ -17,10 +17,10 @@ public class UnidadControlador {
 
     @GetMapping
     public Page<UnidadDTO> listar(@RequestParam(required = false) String q,
-                                  @RequestParam(defaultValue = "0") int page,
-                                  @RequestParam(defaultValue = "20") int size,
-                                  @RequestParam(defaultValue = "nombreUnidad,asc") String sort) {
-        Sort s = parseSort(sort, "nombreUnidad");
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "nombreUnidad,asc") String sort) {
+        Sort s = parseSort(sort, "nombreUnidad"); // propiedad del entity
         Pageable pageable = PageRequest.of(page, size, s);
         return servicio.buscar(q, pageable);
     }
@@ -48,7 +48,8 @@ public class UnidadControlador {
     }
 
     private Sort parseSort(String sort, String fallback) {
-        if (sort == null || sort.isBlank()) return Sort.by(fallback).ascending();
+        if (sort == null || sort.isBlank())
+            return Sort.by(fallback).ascending();
         String[] parts = sort.split(",", 2);
         String field = parts[0].trim().isEmpty() ? fallback : parts[0].trim();
         boolean desc = parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc");

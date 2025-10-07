@@ -4,6 +4,9 @@ import com.soyanga.soyangabackend.dominio.UnidadMedida;
 import com.soyanga.soyangabackend.dto.catalogo.*;
 import com.soyanga.soyangabackend.repositorio.catalogo.UnidadMedidaRepositorio;
 import lombok.RequiredArgsConstructor;
+
+import java.util.Locale;
+
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,8 +18,11 @@ public class UnidadServicio {
     private final UnidadMedidaRepositorio repo;
 
     public Page<UnidadDTO> buscar(String q, Pageable pageable) {
-        return repo.buscar((q == null || q.isBlank()) ? null : q.trim(), pageable)
-                .map(this::toDTO);
+        // MISMO patrón que Categorías: patrón ya armado y en lower
+        String pat = (q == null || q.isBlank())
+                ? null
+                : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+        return repo.buscar(pat, pageable).map(this::toDTO);
     }
 
     public UnidadDTO obtener(Long id) {
@@ -29,7 +35,9 @@ public class UnidadServicio {
         var u = UnidadMedida.builder()
                 .nombreUnidad(dto.getNombreUnidad().trim())
                 .simboloUnidad(dto.getSimboloUnidad().trim())
-                .factorConversionBase(dto.getFactorConversionBase() != null ? dto.getFactorConversionBase() : java.math.BigDecimal.ONE)
+                .factorConversionBase(dto.getFactorConversionBase() != null
+                        ? dto.getFactorConversionBase()
+                        : java.math.BigDecimal.ONE)
                 .build();
         return toDTO(repo.save(u));
     }
@@ -37,9 +45,12 @@ public class UnidadServicio {
     @Transactional
     public UnidadDTO actualizar(Long id, UnidadActualizarDTO dto) {
         var u = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Unidad no encontrada"));
-        if (dto.getNombreUnidad() != null) u.setNombreUnidad(dto.getNombreUnidad().trim());
-        if (dto.getSimboloUnidad() != null) u.setSimboloUnidad(dto.getSimboloUnidad().trim());
-        if (dto.getFactorConversionBase() != null) u.setFactorConversionBase(dto.getFactorConversionBase());
+        if (dto.getNombreUnidad() != null)
+            u.setNombreUnidad(dto.getNombreUnidad().trim());
+        if (dto.getSimboloUnidad() != null)
+            u.setSimboloUnidad(dto.getSimboloUnidad().trim());
+        if (dto.getFactorConversionBase() != null)
+            u.setFactorConversionBase(dto.getFactorConversionBase());
         return toDTO(repo.save(u));
     }
 
