@@ -6,6 +6,7 @@ public interface ProveedorListadoProjection {
     String getNit();
     String getContacto();
     String getTelefono();
+    String getDireccion();
     String getCorreoElectronico();
     Boolean getEstadoActivo();
 }
