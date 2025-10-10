@@ -1,3 +1,4 @@
+
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -7,8 +8,10 @@ import logo from "@/assets/logo.jpeg";
 
 function navClass({ isActive }: { isActive: boolean }) {
   return [
+
     "no-underline px-3 py-2 rounded-lg text-sm font-medium transition-colors",
     isActive ? "bg-emerald-600 text-white shadow-sm" : "text-emerald-700 hover:bg-emerald-50",
+
   ].join(" ");
 }
 
@@ -69,6 +72,7 @@ export default function AppLayout() {
 
   /** ======== Render ======== */
   return (
+
       <div className="min-h-screen bg-white text-neutral-900">
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-neutral-200">
           <nav className="mx-auto max-w-7xl px-4 py-3 flex items-center gap-3">

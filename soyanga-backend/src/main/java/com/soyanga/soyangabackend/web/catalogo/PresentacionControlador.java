@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+// imports nuevos:
+import org.springframework.web.multipart.MultipartFile;
+
 @RestController
 @RequestMapping("/api/v1/catalogo/presentaciones")
 @RequiredArgsConstructor
@@ -24,11 +27,14 @@ public class PresentacionControlador {
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "codigoSku,asc") String sort
-    ) {
+            @RequestParam(defaultValue = "codigoSku,asc") String sort,
+            @RequestParam(defaultValue = "true") boolean soloActivos) {
         Sort s = parseSort(sort, "codigoSku");
         Pageable pageable = PageRequest.of(page, size, s);
-        return presentacionServicio.buscar(idProducto, q, pageable);
+        // si soloActivos=true → filtra estadoActivo=true; si es false → no filtra
+        // (muestra todos)
+        Boolean estadoActivo = soloActivos ? Boolean.TRUE : null;
+        return presentacionServicio.buscar(idProducto, q, estadoActivo, pageable);
     }
 
     @GetMapping("/{id}")
@@ -63,23 +69,37 @@ public class PresentacionControlador {
     @PostMapping("/{idPresentacion}/codigos-barras")
     @ResponseStatus(HttpStatus.CREATED)
     public CodigoBarrasDTO agregarCodigo(@PathVariable Long idPresentacion,
-                                         @Valid @RequestBody CodigoBarrasCrearDTO dto) {
+            @Valid @RequestBody CodigoBarrasCrearDTO dto) {
         return presentacionServicio.agregarCodigo(idPresentacion, dto);
     }
 
     @DeleteMapping("/{idPresentacion}/codigos-barras/{idCodigoBarras}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void eliminarCodigo(@PathVariable Long idPresentacion,
-                               @PathVariable Long idCodigoBarras) {
+            @PathVariable Long idCodigoBarras) {
         presentacionServicio.eliminarCodigo(idPresentacion, idCodigoBarras);
     }
 
     // util
     private Sort parseSort(String sort, String fallback) {
-        if (sort == null || sort.isBlank()) return Sort.by(fallback).ascending();
+        if (sort == null || sort.isBlank())
+            return Sort.by(fallback).ascending();
         String[] parts = sort.split(",", 2);
         String field = parts[0].trim().isEmpty() ? fallback : parts[0].trim();
         boolean desc = parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc");
         return desc ? Sort.by(field).descending() : Sort.by(field).ascending();
+    }
+
+    @PostMapping("/{id}/imagen")
+    @ResponseStatus(HttpStatus.OK)
+    public PresentacionDTO subirImagen(@PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        return presentacionServicio.subirImagen(id, file);
+    }
+
+    @DeleteMapping("/{id}/imagen")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarImagen(@PathVariable Long id) {
+        presentacionServicio.eliminarImagen(id);
     }
 }

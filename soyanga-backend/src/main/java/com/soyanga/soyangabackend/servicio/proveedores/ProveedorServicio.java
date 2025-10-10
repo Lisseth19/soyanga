@@ -22,6 +22,7 @@ public class ProveedorServicio {
                 .contacto(p.getContacto())
                 .telefono(p.getTelefono())
                 .correoElectronico(p.getCorreoElectronico())
+                .direccion(p.getDireccion())
                 .estadoActivo(p.getEstadoActivo())
                 .build());
     }

@@ -3,225 +3,279 @@ import { categoriaService } from "@/servicios/categoria";
 import type { Categoria, CategoriaCrearDTO } from "@/types/categoria";
 import { Paginacion } from "@/componentes/Paginacion";
 import CategoriaModal from "@/componentes/ui/CategoriaModal";
-import { useAuth } from "@/context/AuthContext";
+import { Pencil, Trash2 } from "lucide-react"; // ← íconos
+import { ApiError } from "@/servicios/httpClient";
 
 export default function Categorias() {
-    const { user } = useAuth() as { user?: any };
+  // filtros
+  const [q, setQ] = useState("");
+  const [soloRaices, setSoloRaices] = useState(false);
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState(20);
 
-    // ====== helper permisos (ADMIN ve todo) ======
-    const can = useMemo(() => {
-        const perms: string[] = user?.permisos ?? [];
-        const roles: string[] = user?.roles ?? [];
-        const isAdmin = roles.includes("ADMIN");
-        return (perm: string) => isAdmin || perms.includes(perm);
-    }, [user]);
+  // datos
+  const [rows, setRows] = useState<Categoria[]>([]);
+  const [total, setTotal] = useState(0);
+  const totalPages = useMemo(() => Math.ceil(total / size), [total, size]);
+  const [loading, setLoading] = useState(false);
+  // ↓ NUEVO: opciones simples para mapear id → nombre
+  const [catOpts, setCatOpts] = useState<Array<{ id: number; nombre: string }>>([]);
 
-    // ====== filtros / paginación ======
-    const [q, setQ] = useState("");
-    const [soloRaices, setSoloRaices] = useState(false);
-    const [page, setPage] = useState(0);
-    const [size, setSize] = useState(20);
 
-    // ====== datos / estado ======
-    const [rows, setRows] = useState<Categoria[]>([]);
-    const [total, setTotal] = useState(0);
-    const totalPages = useMemo(() => Math.ceil(total / size), [total, size]);
-    const [loading, setLoading] = useState(false);
-    const [err, setErr] = useState<string | null>(null);
+  // modales
+  const [showNew, setShowNew] = useState(false);
+  const [editRow, setEditRow] = useState<Categoria | null>(null);
 
-    // ====== modales ======
-    const [showNew, setShowNew] = useState(false);
-    const [editRow, setEditRow] = useState<Categoria | null>(null);
-
-    // ====== helpers ======
-    function show403Generic() {
-        alert("No tienes permiso para realizar esta acción.");
+  // carga
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const res = await categoriaService.list({
+        q: q || undefined,
+        soloRaices: soloRaices || undefined,
+        page,
+        size,
+        sort: "nombreCategoria,asc",
+      });
+      setRows(res.content);
+      setTotal(res.totalElements);
+    } finally {
+      setLoading(false);
     }
+  };
+  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [q, soloRaices, page, size]);
 
-    const cargar = async () => {
-        setLoading(true);
-        setErr(null);
-        try {
-            const res = await categoriaService.list({
-                q: q || undefined,
-                soloRaices: soloRaices || undefined,
-                page,
-                size,
-                sort: "nombreCategoria,asc",
-            });
-            setRows(res.content);
-            setTotal(res.totalElements);
-        } catch (e: any) {
-            if (e?.status === 403) {
-                setErr("Acceso denegado.");
-            } else {
-                setErr(e?.message || "No se pudo cargar categorías.");
-            }
-        } finally {
-            setLoading(false);
+  // ↓ NUEVO: carga de opciones {id, nombre} para mostrar el nombre del padre
+  const cargarOpciones = async () => {
+    try {
+      const opts = await categoriaService.options({});
+      setCatOpts(opts);
+    } catch {
+      setCatOpts([]);
+    }
+  };
+  useEffect(() => { cargarOpciones(); }, []);
+
+  // ↓ NUEVO: mapa para resolver rápido el nombre del padre
+  const parentNameMap = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const o of catOpts) m.set(o.id, o.nombre);
+    return m;
+  }, [catOpts]);
+
+
+  // acciones CRUD
+  const onCrear = async (payload: CategoriaCrearDTO) => {
+    await categoriaService.create(payload);
+    setPage(0);
+    await cargar();
+    await cargarOpciones();
+  };
+
+  const onEditar = async (id: number, payload: CategoriaCrearDTO) => {
+    await categoriaService.update(id, payload);
+    await cargar();
+    await cargarOpciones();
+  };
+
+  const onEliminar = async (id: number) => {
+    if (!confirm("¿Eliminar esta categoría?")) return;
+
+    try {
+      await categoriaService.remove(id);
+      await cargar();
+      await cargarOpciones();
+    } catch (e: any) {
+      // Intenta usar el mensaje del backend; si no, mapea por código
+      let msg = "No se pudo eliminar la categoría.";
+
+      if (e instanceof ApiError) {
+        // Si tu backend devuelve 409/400 para integridad referencial:
+        if (e.status === 409 || e.status === 500) {
+          msg =
+            "No se puede eliminar la categoría porque tiene productos asociados.";
+        } else if (typeof e.details === "string") {
+          // A veces tu httpClient trae el body como texto
+          const t = e.details.toLowerCase();
+          if (t.includes("llave foránea") || t.includes("foreign key") || t.includes("23503")) {
+            msg =
+              "No se puede eliminar la categoría porque tiene productos asociados.";
+          } else {
+            msg = e.details;
+          }
+        } else if (typeof e.message === "string" && e.message.trim()) {
+          msg = e.message;
         }
-    };
+      }
 
-    useEffect(() => {
-        cargar();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [q, soloRaices, page, size]);
+      alert(msg);
+    }
+  };
 
-    const onCrear = async (payload: CategoriaCrearDTO) => {
-        if (!can("categorias:crear")) {
-            return show403Generic();
-        }
-        try {
-            await categoriaService.create(payload);
-            setPage(0);
-            await cargar();
-        } catch (e: any) {
-            if (e?.status === 403) return show403Generic();
-            alert(e?.message || "No se pudo crear la categoría.");
-        }
-    };
+  // helper para mostrar el padre
+  // antes: const textoPadre = (c: Categoria) => (c.idCategoriaPadre ?? "—");
+  const textoPadre = (c: Categoria) => {
+    const idPadre = c.idCategoriaPadre;
+    if (!idPadre) return "—";
+    return parentNameMap.get(idPadre) ?? String(idPadre); // fallback al id si no está en el mapa
+  };
 
-    const onEditar = async (id: number, payload: CategoriaCrearDTO) => {
-        if (!can("categorias:actualizar")) {
-            return show403Generic();
-        }
-        try {
-            await categoriaService.update(id, payload);
-            await cargar();
-        } catch (e: any) {
-            if (e?.status === 403) return show403Generic();
-            alert(e?.message || "No se pudo actualizar la categoría.");
-        }
-    };
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-semibold mb-4">Categorías</h1>
 
-    const onEliminar = async (id: number) => {
-        if (!can("categorias:eliminar")) {
-            return show403Generic();
-        }
-        if (!confirm("¿Eliminar esta categoría?")) return;
-        try {
-            await categoriaService.remove(id);
-            await cargar();
-        } catch (e: any) {
-            if (e?.status === 403) return show403Generic();
-            alert(e?.message || "No se pudo eliminar la categoría.");
-        }
-    };
-
-    return (
-        <div className="p-4">
-            <div className="flex items-end justify-between mb-3">
-                <div className="flex items-center gap-3">
-                    <div>
-                        <div className="text-sm text-gray-600">Buscar</div>
-                        <input
-                            value={q}
-                            onChange={(e) => { setPage(0); setQ(e.target.value); }}
-                            placeholder="Nombre o descripción…"
-                            className="border rounded px-3 py-2 w-72"
-                        />
-                    </div>
-                    <label className="inline-flex items-center gap-2 mt-5">
-                        <input
-                            type="checkbox"
-                            checked={soloRaices}
-                            onChange={(e) => { setPage(0); setSoloRaices(e.target.checked); }}
-                        />
-                        Solo raíces (sin padre)
-                    </label>
-                </div>
-
-                {/* Botón crear sólo si tiene permiso */}
-                {can("categorias:crear") ? (
-                    <button className="bg-green-600 text-white px-3 py-2 rounded" onClick={() => setShowNew(true)}>
-                        + Nueva categoría
-                    </button>
-                ) : (
-                    <div className="text-sm text-neutral-600">Sin permiso para crear.</div>
-                )}
-            </div>
-
-            {err && <div className="text-red-600 mb-2">Error: {err}</div>}
-
-            <table className="min-w-[820px] border rounded overflow-hidden">
-                <thead>
-                <tr className="bg-gray-100">
-                    <th className="text-left p-2 w-[280px]">Nombre</th>
-                    <th className="text-left p-2">Padre</th>
-                    <th className="text-left p-2">Descripción</th>
-                    <th className="text-left p-2 w-[160px]">Acciones</th>
-                </tr>
-                </thead>
-                <tbody>
-                {loading ? (
-                    <tr><td className="p-4" colSpan={4}>Cargando…</td></tr>
-                ) : rows.length ? (
-                    rows.map((c) => (
-                        <tr key={c.idCategoria} className="border-t">
-                            <td className="p-2 font-medium">{c.nombreCategoria}</td>
-                            <td className="p-2">{c.idCategoriaPadre ?? "—"}</td>
-                            <td className="p-2">{c.descripcion || "—"}</td>
-                            <td className="p-2">
-                                <div className="flex items-center gap-2">
-                                    {can("categorias:actualizar") && (
-                                        <button className="text-blue-600" onClick={() => setEditRow(c)}>Editar</button>
-                                    )}
-                                    {can("categorias:eliminar") && (
-                                        <button className="text-red-600" onClick={() => onEliminar(c.idCategoria)}>Eliminar</button>
-                                    )}
-                                </div>
-                            </td>
-                        </tr>
-                    ))
-                ) : (
-                    <tr><td className="p-4 text-center" colSpan={4}>Sin resultados</td></tr>
-                )}
-                </tbody>
-            </table>
-
-            {totalPages > 1 && (
-                <div className="mt-3">
-                    <Paginacion
-                        page={page}
-                        totalPages={totalPages}
-                        totalElements={total}
-                        size={size}
-                        setPage={setPage}
-                        setSize={setSize}
-                        loading={loading}
-                        isFirst={page === 0}
-                        isLast={page + 1 >= totalPages}
-                    />
-                </div>
-            )}
-
-            {/* Crear */}
-            <CategoriaModal
-                open={showNew}
-                onClose={() => setShowNew(false)}
-                onSubmit={onCrear}
-                title="Nueva categoría"
+      {/* Filtros / acciones */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4 items-end justify-between">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col">
+            <label className="text-sm text-neutral-600 mb-1">Buscar</label>
+            <input
+              value={q}
+              onChange={(e) => { setPage(0); setQ(e.target.value); }}
+              placeholder="Nombre o descripción…"
+              className="border rounded-lg px-3 py-2 w-full sm:w-72"
             />
 
-            {/* Editar */}
-            <CategoriaModal
-                open={!!editRow}
-                onClose={() => setEditRow(null)}
-                title="Editar categoría"
-                initial={
-                    editRow ? {
-                        nombreCategoria: editRow.nombreCategoria,
-                        descripcion: editRow.descripcion ?? "",
-                        idCategoriaPadre: editRow.idCategoriaPadre ?? null,
-                    } : undefined
-                }
-                excludeIdAsParent={editRow?.idCategoria ?? null}
-                onSubmit={async (payload) => {
-                    if (!editRow) return;
-                    await onEditar(editRow.idCategoria, payload);
-                    setEditRow(null);
-                }}
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm text-neutral-700 mb-1 sm:mb-0">
+            <input
+              type="checkbox"
+              className="accent-emerald-600"
+              checked={soloRaices}
+              onChange={(e) => { setPage(0); setSoloRaices(e.target.checked); }}
             />
+            Solo raíces (sin padre)
+          </label>
         </div>
-    );
+
+        <button
+          className="h-10 px-4 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+          onClick={() => setShowNew(true)}
+        >
+          + Nueva categoría
+        </button>
+      </div>
+
+      {/* Encabezado solo en md+ */}
+      <div className="hidden md:grid md:grid-cols-[1.2fr_0.6fr_1.8fr_120px] items-center text-xs uppercase text-neutral-500 px-3">
+        <div>Nombre</div>
+        <div>Padre</div>
+        <div>Descripción</div>
+        <div className="text-right pr-1">Acciones</div>
+      </div>
+
+
+      {/* Filas tipo card, sin tabla */}
+      <div className="mt-2 space-y-3">
+        {loading ? (
+          <div className="bg-white rounded-xl p-4 shadow-sm">Cargando…</div>
+        ) : rows.length ? (
+          rows.map((c) => (
+            <div
+              key={c.idCategoria}
+              // En móvil: 1 columna (card). En md+: 4 columnas (tabla).
+              className="
+      grid grid-cols-1 md:grid-cols-[1.2fr_0.6fr_1.8fr_120px]
+      items-center gap-2 bg-white rounded-xl p-3 shadow-sm
+      hover:shadow-md transition
+    "
+            >
+              {/* Columna 1: Nombre (siempre) */}
+              <div className="min-w-0">
+                <div className="font-semibold text-neutral-800 truncate">
+                  {c.nombreCategoria}
+                </div>
+
+                {/* Subtítulo en móvil: Padre · Descripción */}
+                <div className="mt-1 text-[13px] text-neutral-600 md:hidden break-words">
+                  <span className="font-medium text-neutral-700">Padre:</span>{" "}
+                  {textoPadre(c)}{" "}<span className="mx-1">·</span>{" "}
+                  <span className="font-medium text-neutral-700">Desc:</span>{" "}
+                  {c.descripcion || "—"}
+                </div>
+              </div>
+
+              {/* Columna 2 (md+): Padre */}
+              <div className="hidden md:block truncate">{textoPadre(c)}</div>
+
+              {/* Columna 3 (md+): Descripción */}
+              <div className="hidden md:block truncate">{c.descripcion || "—"}</div>
+
+              {/* Columna 4: Acciones */}
+              <div className="flex items-center md:justify-end gap-1 mt-2 md:mt-0">
+                <button
+                  aria-label="Editar"
+                  title="Editar"
+                  onClick={() => setEditRow(c)}
+                  className="p-2 rounded-md hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
+                >
+                  <Pencil size={18} />
+                </button>
+                <button
+                  aria-label="Eliminar"
+                  title="Eliminar"
+                  onClick={() => onEliminar(c.idCategoria)}
+                  className="p-2 rounded-md hover:bg-neutral-100 text-rose-600 hover:text-rose-700"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            </div>
+          ))
+
+        ) : (
+          <div className="text-center text-neutral-500 py-10 bg-white rounded-xl">
+            Sin registros
+          </div>
+        )}
+      </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <Paginacion
+            page={page}
+            totalPages={totalPages}
+            totalElements={total}
+            size={size}
+            setPage={setPage}
+            setSize={setSize}
+            loading={loading}
+            isFirst={page === 0}
+            isLast={page + 1 >= totalPages}
+          />
+        </div>
+      )}
+
+      {/* Crear */}
+      <CategoriaModal
+        open={showNew}
+        onClose={() => setShowNew(false)}
+        onSubmit={onCrear}
+        title="Nueva categoría"
+      />
+
+      {/* Editar */}
+      <CategoriaModal
+        open={!!editRow}
+        onClose={() => setEditRow(null)}
+        title="Editar categoría"
+        initial={
+          editRow
+            ? {
+              nombreCategoria: editRow.nombreCategoria,
+              descripcion: editRow.descripcion ?? "",
+              idCategoriaPadre: editRow.idCategoriaPadre ?? null,
+            }
+            : undefined
+        }
+        excludeIdAsParent={editRow?.idCategoria ?? null}
+        onSubmit={async (payload) => {
+          if (!editRow) return;
+          await onEditar(editRow.idCategoria, payload);
+          setEditRow(null);
+        }}
+      />
+    </div>
+  );
 }
