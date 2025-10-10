@@ -6,7 +6,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Service;
 
-import java.util.stream.Collectors;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -16,28 +17,44 @@ public class UsuarioDetallesService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
-        var user = usuarioRepo.findByNombreUsuarioIgnoreCase(usernameOrEmail)
-                .or(() -> usuarioRepo.findByCorreoElectronicoIgnoreCase(usernameOrEmail))
+        final var key = usernameOrEmail == null ? "" : usernameOrEmail.trim();
+
+        var user = usuarioRepo.findByNombreUsuarioIgnoreCase(key)
+                .or(() -> usuarioRepo.findByCorreoElectronicoIgnoreCase(key))
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado"));
 
-        if (user.getEstadoActivo() != null && !user.getEstadoActivo()) {
+        if (Boolean.FALSE.equals(user.getEstadoActivo())) {
             throw new UsernameNotFoundException("Usuario inactivo");
         }
 
-        var roles = usuarioRepo.rolesDeUsuario(user.getIdUsuario());
-        var permisos = usuarioRepo.permisosDeUsuario(user.getIdUsuario());
+        // IMPORTANTE: asegúrate que estos métodos ya filtran por roles/permisos activos en DB
+        var roles = usuarioRepo.rolesDeUsuario(user.getIdUsuario());       // p.ej. ["ADMIN","VENTAS"]
+        var permisos = usuarioRepo.permisosDeUsuario(user.getIdUsuario()); // p.ej. ["permisos:read","roles:write",...]
 
-        var authorities = new java.util.ArrayList<SimpleGrantedAuthority>();
-        authorities.addAll(roles.stream()
-                .map(r -> new SimpleGrantedAuthority("ROLE_" + r.toUpperCase()))
-                .collect(Collectors.toList()));
-        authorities.addAll(permisos.stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toList()));
+        // Evita duplicados y nulls
+        Set<SimpleGrantedAuthority> authorities = new LinkedHashSet<>();
 
-        return User.withUsername(
-                        user.getNombreUsuario() != null ? user.getNombreUsuario() : user.getCorreoElectronico()
-                )
+        // Si usas hasRole("...") en algún lugar, mantén roles:
+        for (String r : roles) {
+            if (r == null || r.isBlank()) continue;
+            var roleName = r.trim();
+            // añade prefijo ROLE_ solo si no está
+            if (!roleName.startsWith("ROLE_")) {
+                roleName = "ROLE_" + roleName.toUpperCase();
+            }
+            authorities.add(new SimpleGrantedAuthority(roleName));
+        }
+
+        // Permisos tal cual los definiste en la tabla (deben coincidir EXACTO con hasAuthority("..."))
+        for (String p : permisos) {
+            if (p == null || p.isBlank()) continue;
+            authorities.add(new SimpleGrantedAuthority(p.trim()));
+        }
+
+        // Elige un identificador estable para el username del UserDetails (debe coincidir con el 'sub' del JWT)
+        final String principalUsername = user.getNombreUsuario(); // recomendado: siempre nombre de usuario
+
+        return User.withUsername(principalUsername)
                 .password(user.getContrasenaHash())
                 .authorities(authorities)
                 .accountLocked(false).accountExpired(false)
