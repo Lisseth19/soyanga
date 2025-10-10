@@ -1,21 +1,25 @@
 // src/paginas/Proveedores.tsx
-import { useEffect, useState } from "react";
-import {
-    listarProveedores,
-    crearProveedor,
-    editarProveedor,
-    eliminarProveedor,
-} from "../../servicios/proveedor";
-import type { Proveedor } from "../../types/proveedor";
-import type { Page } from "../../types/pagination";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { ProveedorService } from "@/servicios/proveedor";
+import type { Proveedor } from "@/types/proveedor";
+import type { Page } from "@/types/pagination";
 
 function formatId(n: number) {
     const num = Number.isFinite(n) ? Math.trunc(n) : 0;
     return `P${String(num).padStart(4, "0")}`;
 }
 
-export default function Proveedores() {
-    // búsqueda
+export default function ProveedoresPage() {
+    const { can } = useAuth() as { can: (permiso: string) => boolean };
+
+    // permisos
+    const canVer = useMemo(() => can("proveedores:ver"), [can]);
+    const canCrear = useMemo(() => can("proveedores:crear"), [can]);
+    const canEditar = useMemo(() => can("proveedores:actualizar"), [can]);
+    const canEliminar = useMemo(() => can("proveedores:eliminar"), [can]);
+
+    // búsqueda con debounce
     const [q, setQ] = useState("");
     const [query, setQuery] = useState("");
 
@@ -42,7 +46,10 @@ export default function Proveedores() {
     // modal Ver Más
     const [verMas, setVerMas] = useState<Proveedor | null>(null);
 
-    // debounce búsqueda
+    const DEFAULT_SORT = "razonSocial,asc";
+    const show403 = () => alert("No tienes permiso para realizar esta acción.");
+
+    // debounce
     useEffect(() => {
         const t = setTimeout(() => setQuery(q.trim()), 300);
         return () => clearTimeout(t);
@@ -50,13 +57,26 @@ export default function Proveedores() {
 
     // cargar
     async function load() {
+        if (!canVer) {
+            setError("Acceso denegado.");
+            setPage(null);
+            return;
+        }
         setLoading(true);
         setError(null);
         try {
-            const res = await listarProveedores({ q: query, page: 0, size: 20 });
+            const res = await ProveedorService.listar({
+                q: query || undefined,
+                page: 0,
+                size: 20,
+                sort: DEFAULT_SORT,
+                soloActivos: false,
+            });
             setPage(res);
         } catch (e: any) {
-            setError(e?.message ?? "Error al listar proveedores");
+            if (e?.status === 401) setError("No autorizado. Inicia sesión nuevamente.");
+            else if (e?.status === 403) setError("Acceso denegado.");
+            else setError(e?.message ?? "Error al listar proveedores");
         } finally {
             setLoading(false);
         }
@@ -80,12 +100,14 @@ export default function Proveedores() {
     }
 
     function startCreate() {
+        if (!canCrear) return show403();
         resetForm();
         setPanelOpen(true);
         setTimeout(() => document.getElementById("f-razon")?.focus(), 0);
     }
 
     function startEdit(p: Proveedor) {
+        if (!canEditar) return show403();
         setEdit(p);
         setForm({
             razonSocial: p.razonSocial || "",
@@ -106,14 +128,30 @@ export default function Proveedores() {
             alert("La razón social es obligatoria");
             return;
         }
+        const payload: any = {
+            razonSocial: form.razonSocial?.trim(),
+            nit: form.nit?.trim() || undefined,
+            contacto: form.contacto?.trim() || undefined,
+            telefono: form.telefono?.trim() || undefined,
+            correoElectronico: form.correoElectronico?.trim() || undefined,
+            direccion: form.direccion?.trim() || undefined,
+            estadoActivo: !!form.estadoActivo,
+        };
+
         try {
             setLoading(true);
-            if (edit) await editarProveedor(edit.idProveedor, form);
-            else await crearProveedor(form as any);
+            if (edit) {
+                if (!canEditar) return show403();
+                await ProveedorService.editar(edit.idProveedor, payload);
+            } else {
+                if (!canCrear) return show403();
+                await ProveedorService.crear(payload);
+            }
             await load();
             resetForm();
             setPanelOpen(false);
         } catch (e: any) {
+            if (e?.status === 403) return show403();
             alert(e?.message ?? "Error al guardar");
         } finally {
             setLoading(false);
@@ -121,12 +159,14 @@ export default function Proveedores() {
     }
 
     async function onDelete(p: Proveedor) {
+        if (!canEliminar) return show403();
         if (!confirm(`¿Eliminar a "${p.razonSocial}"?`)) return;
         try {
             setLoading(true);
-            await eliminarProveedor(p.idProveedor);
+            await ProveedorService.eliminar(p.idProveedor);
             await load();
         } catch (e: any) {
+            if (e?.status === 403) return show403();
             alert(e?.message ?? "Error al eliminar");
         } finally {
             setLoading(false);
@@ -136,30 +176,28 @@ export default function Proveedores() {
     // ordenar por id ascendente (visual)
     const rows = (page?.content ?? []).slice().sort((a, b) => a.idProveedor - b.idProveedor);
 
-    // anchos de columnas: compactamos cuando hay panel
-    const wId = panelOpen ? "w-[90px]" : "w-[110px]";
-    const wTel = panelOpen ? "w-[130px]" : "w-[150px]";
-    const wCorreo = panelOpen ? "w-[220px]" : "w-[260px]";
-    const wAcc = panelOpen ? "w-[170px]" : "w-[190px]";
+    // anchos dinámicos
+    const panel = panelOpen;
+    const wId = panel ? "w-[90px]" : "w-[110px]";
+    const wTel = panel ? "w-[130px]" : "w-[150px]";
+    const wCorreo = panel ? "w-[220px]" : "w-[260px]";
+    const wAcc = panel ? "w-[170px]" : "w-[190px]";
 
     return (
-        // GRID responsive: [listado] o [listado, panel]
         <div
             className={[
                 "grid gap-6 px-4 md:px-6 lg:px-8 py-4 md:py-6 transition-all duration-300",
-                panelOpen ? "lg:grid-cols-[1fr_420px]" : "lg:grid-cols-[1fr]",
+                panel ? "lg:grid-cols-[1fr_420px]" : "lg:grid-cols-[1fr]",
             ].join(" ")}
         >
             {/* === LISTADO === */}
             <section>
-                {/* Encabezado compacto + buscador + botón al lado */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4 mb-3">
                     <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-800">
                         Gestión de Proveedores
                     </h1>
 
                     <div className="flex items-center gap-3 md:gap-4">
-                        {/* Buscador más corto */}
                         <div className="relative w-64 md:w-72">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                             <input
@@ -167,34 +205,30 @@ export default function Proveedores() {
                                 onChange={(e) => setQ(e.target.value)}
                                 placeholder="Buscar proveedor..."
                                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50
-                           text-sm placeholder-gray-400 text-gray-800
-                           focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  text-sm placeholder-gray-400 text-gray-800
+                  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                 type="text"
                             />
                         </div>
 
-                        {/* Botón a la derecha del buscador (se apilan en mobile) */}
-                        <button
-                            onClick={startCreate}
-                            className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-5 py-2.5 shadow"
-                        >
-                            Agregar proveedor
-                        </button>
+                        {canCrear && (
+                            <button
+                                onClick={startCreate}
+                                className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-5 py-2.5 shadow"
+                            >
+                                Agregar proveedor
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                {/* Tabla subida (menos margen) */}
                 <div className="rounded-xl border border-gray-200 overflow-hidden">
                     <table className="min-w-full table-fixed">
                         <colgroup>
                             <col className={wId} />
-                            {/* Proveedor: reparte ~40% del ancho */}
                             <col className="w-[38%] md:w-[40%]" />
-                            {/* Teléfono: ~15% */}
                             <col className={`${wTel} w-[16%] md:w-[15%]`} />
-                            {/* Correo: ~25% */}
                             <col className={`${wCorreo} w-[26%] md:w-[25%]`} />
-                            {/* Acciones: ~20% */}
                             <col className={`${wAcc} w-[18%] md:w-[20%]`} />
                         </colgroup>
 
@@ -223,7 +257,7 @@ export default function Proveedores() {
                                 </td>
                             </tr>
                         )}
-                        {!loading && rows.length === 0 && (
+                        {!loading && !error && rows.length === 0 && (
                             <tr>
                                 <td colSpan={5} className="px-6 py-8 text-center text-gray-400">
                                     No hay proveedores
@@ -231,56 +265,69 @@ export default function Proveedores() {
                             </tr>
                         )}
 
-                        {rows.map((p) => (
-                            <tr key={p.idProveedor} className="bg-white">
-                                <td className="px-6 py-4 font-extrabold text-gray-800 whitespace-nowrap">
-                                    {formatId(p.idProveedor)}
-                                </td>
+                        {!loading &&
+                            !error &&
+                            rows.map((p) => (
+                                <tr key={p.idProveedor} className="bg-white">
+                                    <td className="px-6 py-4 font-extrabold text-gray-800 whitespace-nowrap">
+                                        {formatId(p.idProveedor)}
+                                    </td>
 
-                                <td className="px-6 py-4 text-gray-900">
-                                    <div className="truncate" title={p.razonSocial}>
-                                        {p.razonSocial}
-                                    </div>
-                                </td>
+                                    <td className="px-6 py-4 text-gray-900">
+                                        <div className="truncate" title={p.razonSocial}>
+                                            {p.razonSocial}
+                                        </div>
+                                    </td>
 
-                                <td className="px-6 py-4 text-gray-900 whitespace-nowrap">
-                                    {p.telefono || "—"}
-                                </td>
+                                    <td className="px-6 py-4 text-gray-900 whitespace-nowrap">
+                                        {p.telefono || "—"}
+                                    </td>
 
-                                <td className="px-6 py-4 text-gray-900 whitespace-nowrap">
-                                    {p.correoElectronico || "—"}
-                                </td>
+                                    <td className="px-6 py-4 text-gray-900 whitespace-nowrap">
+                                        {p.correoElectronico || "—"}
+                                    </td>
 
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-4 text-sm whitespace-nowrap">
-                                        <button className="text-blue-600 hover:underline" onClick={() => startEdit(p)}>
-                                            Editar
-                                        </button>
-                                        <button className="text-red-600 hover:underline" onClick={() => onDelete(p)}>
-                                            Eliminar
-                                        </button>
-                                        <button className="text-gray-600 hover:underline" onClick={() => setVerMas(p)}>
-                                            Ver Más
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-4 text-sm whitespace-nowrap">
+                                            {canEditar && (
+                                                <button
+                                                    className="text-blue-600 hover:underline"
+                                                    onClick={() => startEdit(p)}
+                                                >
+                                                    Editar
+                                                </button>
+                                            )}
+                                            {canEliminar && (
+                                                <button
+                                                    className="text-red-600 hover:underline"
+                                                    onClick={() => onDelete(p)}
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            )}
+                                            <button
+                                                className="text-gray-600 hover:underline"
+                                                onClick={() => setVerMas(p)}
+                                            >
+                                                Ver Más
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
             </section>
 
-            {/* === PANEL (visible completo) === */}
+            {/* === PANEL (derecha) === */}
             {panelOpen && (
                 <aside
                     className={[
                         "bg-white rounded-2xl border border-gray-300 shadow-2xl",
-                        // menos padding para ganar ancho útil
                         "px-6 md:px-7 py-5",
                         "self-start lg:sticky lg:top-20",
                         "max-h-[calc(100vh-6rem)] overflow-y-auto",
-                        // ocupa toda su columna y desplaza un poco a la izquierda (como clientes)
                         "w-full lg:-mr-4 xl:-mr-8",
                     ].join(" ")}
                 >
@@ -288,7 +335,11 @@ export default function Proveedores() {
                         <h2 className="text-xl font-bold tracking-wide">
                             {edit ? "Editar proveedor" : "Agregar nuevo proveedor"}
                         </h2>
-                        <button className="text-gray-500 hover:text-gray-700" onClick={() => setPanelOpen(false)} aria-label="Cerrar">
+                        <button
+                            className="text-gray-500 hover:text-gray-700"
+                            onClick={() => setPanelOpen(false)}
+                            aria-label="Cerrar"
+                        >
                             ✕
                         </button>
                     </div>
@@ -303,11 +354,19 @@ export default function Proveedores() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <Field label="NIT/ CI:" value={form.nit || ""} onChange={(v) => setForm((f) => ({ ...f, nit: v }))} />
-                            <Field label="Contacto:" value={form.contacto || ""} onChange={(v) => setForm((f) => ({ ...f, contacto: v }))} />
+                            <Field
+                                label="Contacto:"
+                                value={form.contacto || ""}
+                                onChange={(v) => setForm((f) => ({ ...f, contacto: v }))}
+                            />
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <Field label="Teléfono:" value={form.telefono || ""} onChange={(v) => setForm((f) => ({ ...f, telefono: v }))} />
+                            <Field
+                                label="Teléfono:"
+                                value={form.telefono || ""}
+                                onChange={(v) => setForm((f) => ({ ...f, telefono: v }))}
+                            />
                             <Field
                                 label="Correo:"
                                 type="email"
@@ -334,12 +393,18 @@ export default function Proveedores() {
                         </div>
 
                         <div className="flex items-center gap-4 pt-2">
-                            <button type="submit" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-2">
+                            <button
+                                type="submit"
+                                className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-2"
+                            >
                                 {edit ? "Guardar" : "Crear"}
                             </button>
                             <button
                                 type="button"
-                                onClick={() => { resetForm(); setPanelOpen(false); }}
+                                onClick={() => {
+                                    resetForm();
+                                    setPanelOpen(false);
+                                }}
                                 className="rounded-lg bg-red-400 hover:bg-red-500 text-white font-semibold px-6 py-2"
                             >
                                 Cancelar
@@ -349,7 +414,7 @@ export default function Proveedores() {
                 </aside>
             )}
 
-            {/* === MODAL VER MÁS (centrado) === */}
+            {/* === MODAL VER MÁS === */}
             {verMas && (
                 <>
                     <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setVerMas(null)} />
@@ -357,7 +422,13 @@ export default function Proveedores() {
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
                             <div className="flex items-center justify-between px-6 py-4 border-b">
                                 <h3 className="text-xl font-bold">Detalles del Proveedor</h3>
-                                <button className="text-gray-500 hover:text-gray-700" onClick={() => setVerMas(null)} aria-label="Cerrar">✕</button>
+                                <button
+                                    className="text-gray-500 hover:text-gray-700"
+                                    onClick={() => setVerMas(null)}
+                                    aria-label="Cerrar"
+                                >
+                                    ✕
+                                </button>
                             </div>
                             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <Detail label="ID" value={formatId(verMas.idProveedor)} />
@@ -370,12 +441,28 @@ export default function Proveedores() {
                                 <Detail label="Estado" value={verMas.estadoActivo ? "Activo" : "Inactivo"} />
                             </div>
                             <div className="flex justify-end gap-3 px-6 py-4 border-t">
-                                <button className="rounded-md bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2" onClick={() => { startEdit(verMas); setVerMas(null); }}>
-                                    Editar
-                                </button>
-                                <button className="rounded-md bg-red-500 hover:bg-red-600 text-white px-4 py-2" onClick={() => { onDelete(verMas); setVerMas(null); }}>
-                                    Eliminar
-                                </button>
+                                {canEditar && (
+                                    <button
+                                        className="rounded-md bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2"
+                                        onClick={() => {
+                                            startEdit(verMas);
+                                            setVerMas(null);
+                                        }}
+                                    >
+                                        Editar
+                                    </button>
+                                )}
+                                {canEliminar && (
+                                    <button
+                                        className="rounded-md bg-red-500 hover:bg-red-600 text-white px-4 py-2"
+                                        onClick={() => {
+                                            onDelete(verMas);
+                                            setVerMas(null);
+                                        }}
+                                    >
+                                        Eliminar
+                                    </button>
+                                )}
                                 <button className="rounded-md border px-4 py-2" onClick={() => setVerMas(null)}>
                                     Cerrar
                                 </button>

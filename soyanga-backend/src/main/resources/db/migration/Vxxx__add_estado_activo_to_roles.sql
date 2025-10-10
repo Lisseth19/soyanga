@@ -1,2 +1,0 @@
-ALTER TABLE roles
-    ADD COLUMN estado_activo BOOLEAN NOT NULL DEFAULT TRUE;

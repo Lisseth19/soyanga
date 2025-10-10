@@ -1,12 +1,8 @@
-import { useEffect, useState } from "react";
-import {
-    listarClientes,
-    crearCliente,
-    editarCliente,
-    eliminarCliente,
-} from "../../servicios/cliente";
-import type { Cliente } from "../../types/cliente";
-import type { Page } from "../../types/pagination";
+import { useEffect, useState, useMemo } from "react";
+import { ClienteService } from "@/servicios/cliente";
+import type { Cliente } from "@/types/cliente";
+import type { Page } from "@/types/pagination";
+import { useAuth } from "@/context/AuthContext";
 
 const money = new Intl.NumberFormat("es-BO", {
     style: "currency",
@@ -19,8 +15,16 @@ function formatId(n: number) {
     return `C${String(num).padStart(4, "0")}`;
 }
 
-export default function Clientes() {
-    // búsqueda
+export default function ClientesPage() {
+    const { can } = useAuth() as { can: (perm: string) => boolean };
+
+    // ===== permisos (admin ve todo a través de can)
+    const canVer = useMemo(() => can("clientes:ver"), [can]);
+    const canCrear = useMemo(() => can("clientes:crear"), [can]);
+    const canEditar = useMemo(() => can("clientes:actualizar"), [can]);
+    const canEliminar = useMemo(() => can("clientes:eliminar"), [can]);
+
+    // búsqueda (con debounce)
     const [q, setQ] = useState("");
     const [query, setQuery] = useState("");
 
@@ -29,7 +33,7 @@ export default function Clientes() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // panel en layout (derecha)
+    // panel (derecha)
     const [panelOpen, setPanelOpen] = useState(false);
 
     // form + edición
@@ -49,26 +53,47 @@ export default function Clientes() {
     // modal Ver Más
     const [verMas, setVerMas] = useState<Cliente | null>(null);
 
+    // ====== helpers ======
+    const show403 = () => alert("No tienes permiso para realizar esta acción.");
+    const DEFAULT_SORT = "razonSocialONombre,asc";
+
     // debounce búsqueda
     useEffect(() => {
         const t = setTimeout(() => setQuery(q.trim()), 300);
         return () => clearTimeout(t);
     }, [q]);
 
-    // cargar
+    // cargar lista
     async function load() {
+        if (!canVer) {
+            setError("Acceso denegado.");
+            setPage(null);
+            return;
+        }
         setLoading(true);
         setError(null);
         try {
-            const res = await listarClientes({ q: query, page: 0, size: 20 });
-            res.content = res.content.map((c) => ({
+            const res = await ClienteService.listar({
+                q: query || undefined,
+                page: 0,
+                size: 20,
+                sort: DEFAULT_SORT,
+                soloActivos: false,
+            });
+
+            // normaliza límite a number
+            res.content = (res.content ?? []).map((c) => ({
                 ...c,
                 limiteCreditoBob:
-                    typeof c.limiteCreditoBob === "string" ? Number(c.limiteCreditoBob) : c.limiteCreditoBob,
+                    typeof c.limiteCreditoBob === "string"
+                        ? Number(c.limiteCreditoBob)
+                        : c.limiteCreditoBob,
             }));
             setPage(res);
         } catch (e: any) {
-            setError(e?.message ?? "Error al listar clientes");
+            if (e?.status === 401) setError("No autorizado. Inicia sesión nuevamente.");
+            else if (e?.status === 403) setError("Acceso denegado.");
+            else setError(e?.message ?? "Error al listar clientes");
         } finally {
             setLoading(false);
         }
@@ -94,12 +119,14 @@ export default function Clientes() {
     }
 
     function startCreate() {
+        if (!canCrear) return show403();
         resetForm();
         setPanelOpen(true);
         setTimeout(() => document.getElementById("f-nombre")?.focus(), 0);
     }
 
     function startEdit(c: Cliente) {
+        if (!canEditar) return show403();
         setEdit(c);
         setForm({
             razonSocialONombre: c.razonSocialONombre || "",
@@ -110,7 +137,9 @@ export default function Clientes() {
             ciudad: c.ciudad || "",
             condicionDePago: c.condicionDePago ?? "contado",
             limiteCreditoBob:
-                typeof c.limiteCreditoBob === "number" ? c.limiteCreditoBob : Number(c.limiteCreditoBob ?? 0),
+                typeof c.limiteCreditoBob === "number"
+                    ? c.limiteCreditoBob
+                    : Number(c.limiteCreditoBob ?? 0),
             estadoActivo: !!c.estadoActivo,
         });
         setPanelOpen(true);
@@ -123,10 +152,32 @@ export default function Clientes() {
             alert("El nombre es obligatorio");
             return;
         }
+
+        // Normaliza límite a number | undefined
+        const limite =
+            form.limiteCreditoBob === "" || form.limiteCreditoBob === null || form.limiteCreditoBob === undefined
+                ? undefined
+                : Number(form.limiteCreditoBob);
+
+        const payload: any = {
+            razonSocialONombre: form.razonSocialONombre?.trim(),
+            nit: form.nit?.trim() || undefined,
+            telefono: form.telefono?.trim() || undefined,
+            correoElectronico: form.correoElectronico?.trim() || undefined,
+            direccion: form.direccion?.trim() || undefined,
+            ciudad: form.ciudad?.trim() || undefined,
+            condicionDePago: form.condicionDePago ?? "contado",
+            limiteCreditoBob: Number.isFinite(limite as number) ? (limite as number) : undefined,
+            estadoActivo: !!form.estadoActivo,
+        };
+
         try {
             setLoading(true);
-            if (edit) await editarCliente(edit.idCliente, form);
-            else await crearCliente(form as any);
+            if (edit) {
+                await ClienteService.editar(edit.idCliente, payload); // ← ahora 'limiteCreditoBob' es number|undefined
+            } else {
+                await ClienteService.crear(payload);
+            }
             await load();
             resetForm();
             setPanelOpen(false);
@@ -138,12 +189,14 @@ export default function Clientes() {
     }
 
     async function onDelete(c: Cliente) {
+        if (!canEliminar) return show403();
         if (!confirm(`¿Eliminar a "${c.razonSocialONombre}"?`)) return;
         try {
             setLoading(true);
-            await eliminarCliente(c.idCliente);
+            await ClienteService.eliminar(c.idCliente);
             await load();
         } catch (e: any) {
+            if (e?.status === 403) return show403();
             alert(e?.message ?? "Error al eliminar");
         } finally {
             setLoading(false);
@@ -153,7 +206,7 @@ export default function Clientes() {
     // ordenar por id ascendente
     const rows = (page?.content ?? []).slice().sort((a, b) => a.idCliente - b.idCliente);
 
-    // anchos de columnas: compactamos cuando hay panel
+    // anchos de columnas (ajustan cuando panel abierto)
     const wId = panelOpen ? "w-[90px]" : "w-[110px]";
     const wTel = panelOpen ? "w-[130px]" : "w-[150px]";
     const wPago = panelOpen ? "w-[150px]" : "w-[180px]";
@@ -161,7 +214,6 @@ export default function Clientes() {
     const wAcc = panelOpen ? "w-[150px]" : "w-[170px]";
 
     return (
-        // GRID responsive: [listado] o [listado, panel]
         <div
             className={[
                 "grid gap-6 px-4 md:px-6 lg:px-8 py-4 md:py-6 transition-all duration-300",
@@ -170,14 +222,12 @@ export default function Clientes() {
         >
             {/* === LISTADO === */}
             <section>
-                {/* Encabezado compacto + buscador + botón al lado */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4 mb-3">
                     <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-800">
                         Gestión de Clientes
                     </h1>
 
                     <div className="flex items-center gap-3 md:gap-4">
-                        {/* Buscador más corto */}
                         <div className="relative w-64 md:w-72">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                             <input
@@ -185,28 +235,28 @@ export default function Clientes() {
                                 onChange={(e) => setQ(e.target.value)}
                                 placeholder="Buscar cliente..."
                                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 bg-gray-50
-                           text-sm placeholder-gray-400 text-gray-800
-                           focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  text-sm placeholder-gray-400 text-gray-800
+                  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                 type="text"
                             />
                         </div>
 
-                        {/* Botón a la derecha del buscador (se apilan en mobile) */}
-                        <button
-                            onClick={startCreate}
-                            className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-5 py-2.5 shadow"
-                        >
-                            Agregar cliente
-                        </button>
+                        {canCrear && (
+                            <button
+                                onClick={startCreate}
+                                className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-5 py-2.5 shadow"
+                            >
+                                Agregar cliente
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                {/* Tabla subida (menos margen) */}
                 <div className="rounded-xl border border-gray-200 overflow-hidden">
                     <table className="min-w-full table-fixed">
                         <colgroup>
                             <col className={wId} />
-                            <col /> {/* nombre ocupa el resto */}
+                            <col />
                             <col className={wTel} />
                             <col className={wPago} />
                             <col className={wLimite} />
@@ -239,7 +289,7 @@ export default function Clientes() {
                                 </td>
                             </tr>
                         )}
-                        {!loading && rows.length === 0 && (
+                        {!loading && !error && rows.length === 0 && (
                             <tr>
                                 <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
                                     No hay clientes
@@ -247,76 +297,94 @@ export default function Clientes() {
                             </tr>
                         )}
 
-                        {rows.map((c) => (
-                            <tr key={c.idCliente} className="bg-white">
-                                <td className="px-6 py-4 font-extrabold text-gray-800 whitespace-nowrap">
-                                    {formatId(c.idCliente)}
-                                </td>
+                        {!loading &&
+                            !error &&
+                            rows.map((c) => (
+                                <tr key={c.idCliente} className="bg-white">
+                                    <td className="px-6 py-4 font-extrabold text-gray-800 whitespace-nowrap">
+                                        {formatId(c.idCliente)}
+                                    </td>
 
-                                <td className="px-6 py-4 text-gray-900">
-                                    <div className="truncate" title={c.razonSocialONombre}>
-                                        {c.razonSocialONombre}
-                                    </div>
-                                </td>
+                                    <td className="px-6 py-4 text-gray-900">
+                                        <div className="truncate" title={c.razonSocialONombre}>
+                                            {c.razonSocialONombre}
+                                        </div>
+                                    </td>
 
-                                <td className="px-6 py-4 text-gray-900 whitespace-nowrap">
-                                    {c.telefono || "—"}
-                                </td>
+                                    <td className="px-6 py-4 text-gray-900 whitespace-nowrap">
+                                        {c.telefono || "—"}
+                                    </td>
 
-                                <td className="px-6 py-4">
-                                    {c.condicionDePago ? (
-                                        <Pill
-                                            ok={c.condicionDePago === "contado"}
-                                            text={c.condicionDePago === "contado" ? "Contado" : "Crédito"}
-                                        />
-                                    ) : (
-                                        <span className="text-gray-500">—</span>
-                                    )}
-                                </td>
+                                    <td className="px-6 py-4">
+                                        {c.condicionDePago ? (
+                                            <Pill
+                                                ok={c.condicionDePago === "contado"}
+                                                text={c.condicionDePago === "contado" ? "Contado" : "Crédito"}
+                                            />
+                                        ) : (
+                                            <span className="text-gray-500">—</span>
+                                        )}
+                                    </td>
 
-                                <td className="px-6 py-4 text-gray-900 whitespace-nowrap">
-                                    {c.limiteCreditoBob != null ? money.format(Number(c.limiteCreditoBob)) : "—"}
-                                </td>
+                                    <td className="px-6 py-4 text-gray-900 whitespace-nowrap">
+                                        {c.limiteCreditoBob != null
+                                            ? money.format(Number(c.limiteCreditoBob))
+                                            : "—"}
+                                    </td>
 
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-4 text-sm whitespace-nowrap">
-                                        <button className="text-blue-600 hover:underline" onClick={() => startEdit(c)}>
-                                            Editar
-                                        </button>
-                                        <button className="text-red-600 hover:underline" onClick={() => onDelete(c)}>
-                                            Eliminar
-                                        </button>
-                                        <button className="text-gray-600 hover:underline" onClick={() => setVerMas(c)}>
-                                            Ver Más
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-4 text-sm whitespace-nowrap">
+                                            {canEditar && (
+                                                <button
+                                                    className="text-blue-600 hover:underline"
+                                                    onClick={() => startEdit(c)}
+                                                >
+                                                    Editar
+                                                </button>
+                                            )}
+                                            {canEliminar && (
+                                                <button
+                                                    className="text-red-600 hover:underline"
+                                                    onClick={() => onDelete(c)}
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            )}
+                                            <button
+                                                className="text-gray-600 hover:underline"
+                                                onClick={() => setVerMas(c)}
+                                            >
+                                                Ver Más
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
             </section>
 
-            {/* === PANEL (visible completo) === */}
+            {/* === PANEL (derecha) === */}
             {panelOpen && (
                 <aside
                     className={[
                         "bg-white rounded-2xl border border-gray-300 shadow-2xl",
-                        // un pelín menos padding para ganar ancho útil
                         "px-6 md:px-7 py-5",
                         "self-start lg:sticky lg:top-20",
                         "max-h-[calc(100vh-6rem)] overflow-y-auto",
-                        // NUEVO: ocupa toda su columna y muévete un poco a la izquierda
                         "w-full lg:-mr-4 xl:-mr-8",
                     ].join(" ")}
                 >
                     <div className="flex items-center justify-between mb-3">
-                        {/* título más pequeño ya estaba */}
                         <h2 className="text-xl font-bold tracking-wide">
                             {edit ? "Editar cliente" : "Agregar nuevo cliente"}
                         </h2>
-                        <button className="text-gray-500 hover:text-gray-700" onClick={() => setPanelOpen(false)} aria-label="Cerrar">
+                        <button
+                            className="text-gray-500 hover:text-gray-700"
+                            onClick={() => setPanelOpen(false)}
+                            aria-label="Cerrar"
+                        >
                             ✕
                         </button>
                     </div>
@@ -330,8 +398,16 @@ export default function Clientes() {
                         />
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <Field label="Nit/Ci:" value={form.nit || ""} onChange={(v) => setForm((f) => ({ ...f, nit: v }))} />
-                            <Field label="Teléfono:" value={form.telefono || ""} onChange={(v) => setForm((f) => ({ ...f, telefono: v }))} />
+                            <Field
+                                label="Nit/Ci:"
+                                value={form.nit || ""}
+                                onChange={(v) => setForm((f) => ({ ...f, nit: v }))}
+                            />
+                            <Field
+                                label="Teléfono:"
+                                value={form.telefono || ""}
+                                onChange={(v) => setForm((f) => ({ ...f, telefono: v }))}
+                            />
                         </div>
 
                         <Field
@@ -342,8 +418,16 @@ export default function Clientes() {
                         />
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <Field label="Dirección:" value={form.direccion || ""} onChange={(v) => setForm((f) => ({ ...f, direccion: v }))} />
-                            <Field label="Ciudad:" value={form.ciudad || ""} onChange={(v) => setForm((f) => ({ ...f, ciudad: v }))} />
+                            <Field
+                                label="Dirección:"
+                                value={form.direccion || ""}
+                                onChange={(v) => setForm((f) => ({ ...f, direccion: v }))}
+                            />
+                            <Field
+                                label="Ciudad:"
+                                value={form.ciudad || ""}
+                                onChange={(v) => setForm((f) => ({ ...f, ciudad: v }))}
+                            />
                         </div>
 
                         <div>
@@ -351,7 +435,9 @@ export default function Clientes() {
                             <select
                                 className="mt-1 w-full border-b border-gray-400 outline-none pb-1"
                                 value={form.condicionDePago || "contado"}
-                                onChange={(e) => setForm((f) => ({ ...f, condicionDePago: e.target.value as any }))}
+                                onChange={(e) =>
+                                    setForm((f) => ({ ...f, condicionDePago: e.target.value as any }))
+                                }
                             >
                                 <option value="contado">Contado</option>
                                 <option value="credito">Crédito</option>
@@ -363,7 +449,10 @@ export default function Clientes() {
                             type="number"
                             value={form.limiteCreditoBob != null ? String(form.limiteCreditoBob) : ""}
                             onChange={(v) =>
-                                setForm((f) => ({ ...f, limiteCreditoBob: v === "" ? undefined : Number(v) }))
+                                setForm((f) => ({
+                                    ...f,
+                                    limiteCreditoBob: v === "" ? undefined : Number(v),
+                                }))
                             }
                         />
 
@@ -375,16 +464,24 @@ export default function Clientes() {
                                 checked={!!form.estadoActivo}
                                 onChange={(e) => setForm((f) => ({ ...f, estadoActivo: e.target.checked }))}
                             />
-                            <label htmlFor="f-activo" className="text-[15px]">Activo</label>
+                            <label htmlFor="f-activo" className="text-[15px]">
+                                Activo
+                            </label>
                         </div>
 
                         <div className="flex items-center gap-4 pt-2">
-                            <button type="submit" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-2">
+                            <button
+                                type="submit"
+                                className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-2"
+                            >
                                 {edit ? "Guardar" : "Crear"}
                             </button>
                             <button
                                 type="button"
-                                onClick={() => { resetForm(); setPanelOpen(false); }}
+                                onClick={() => {
+                                    resetForm();
+                                    setPanelOpen(false);
+                                }}
                                 className="rounded-lg bg-red-400 hover:bg-red-500 text-white font-semibold px-6 py-2"
                             >
                                 Cancelar
@@ -394,7 +491,7 @@ export default function Clientes() {
                 </aside>
             )}
 
-            {/* === MODAL VER MÁS (centrado) === */}
+            {/* === MODAL VER MÁS === */}
             {verMas && (
                 <>
                     <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setVerMas(null)} />
@@ -402,7 +499,13 @@ export default function Clientes() {
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
                             <div className="flex items-center justify-between px-6 py-4 border-b">
                                 <h3 className="text-xl font-bold">Detalles del Cliente</h3>
-                                <button className="text-gray-500 hover:text-gray-700" onClick={() => setVerMas(null)} aria-label="Cerrar">✕</button>
+                                <button
+                                    className="text-gray-500 hover:text-gray-700"
+                                    onClick={() => setVerMas(null)}
+                                    aria-label="Cerrar"
+                                >
+                                    ✕
+                                </button>
                             </div>
                             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <Detail label="ID" value={formatId(verMas.idCliente)} />
@@ -412,17 +515,49 @@ export default function Clientes() {
                                 <Detail label="Correo" value={verMas.correoElectronico || "—"} />
                                 <Detail label="Dirección" value={verMas.direccion || "—"} />
                                 <Detail label="Ciudad" value={verMas.ciudad || "—"} />
-                                <Detail label="Condición de Pago" value={verMas.condicionDePago ? (verMas.condicionDePago === "contado" ? "Contado" : "Crédito") : "—"} />
-                                <Detail label="Límite de Crédito" value={verMas.limiteCreditoBob != null ? money.format(Number(verMas.limiteCreditoBob)) : "—"} />
+                                <Detail
+                                    label="Condición de Pago"
+                                    value={
+                                        verMas.condicionDePago
+                                            ? verMas.condicionDePago === "contado"
+                                                ? "Contado"
+                                                : "Crédito"
+                                            : "—"
+                                    }
+                                />
+                                <Detail
+                                    label="Límite de Crédito"
+                                    value={
+                                        verMas.limiteCreditoBob != null
+                                            ? money.format(Number(verMas.limiteCreditoBob))
+                                            : "—"
+                                    }
+                                />
                                 <Detail label="Estado" value={verMas.estadoActivo ? "Activo" : "Inactivo"} />
                             </div>
                             <div className="flex justify-end gap-3 px-6 py-4 border-t">
-                                <button className="rounded-md bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2" onClick={() => { startEdit(verMas); setVerMas(null); }}>
-                                    Editar
-                                </button>
-                                <button className="rounded-md bg-red-500 hover:bg-red-600 text-white px-4 py-2" onClick={() => { onDelete(verMas); setVerMas(null); }}>
-                                    Eliminar
-                                </button>
+                                {canEditar && (
+                                    <button
+                                        className="rounded-md bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2"
+                                        onClick={() => {
+                                            startEdit(verMas);
+                                            setVerMas(null);
+                                        }}
+                                    >
+                                        Editar
+                                    </button>
+                                )}
+                                {canEliminar && (
+                                    <button
+                                        className="rounded-md bg-red-500 hover:bg-red-600 text-white px-4 py-2"
+                                        onClick={() => {
+                                            onDelete(verMas);
+                                            setVerMas(null);
+                                        }}
+                                    >
+                                        Eliminar
+                                    </button>
+                                )}
                                 <button className="rounded-md border px-4 py-2" onClick={() => setVerMas(null)}>
                                     Cerrar
                                 </button>
