@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +33,7 @@ public class UsuarioServicio {
                 .telefono(p.getTelefono())
                 .nombreUsuario(p.getNombreUsuario())
                 .estadoActivo(p.getEstadoActivo())
-                .roles(List.of()) // se puede enriquecer con otra consulta si quieres
+                .roles(List.of()) // si quieres enriquecer, carga roles aparte
                 .build());
     }
 
@@ -96,24 +97,73 @@ public class UsuarioServicio {
 
     @Transactional
     public void cambiarPassword(Long id, UsuarioCambiarPasswordDTO dto) {
-        var u = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + id));
-        u.setContrasenaHash(passwordEncoder.encode(dto.getNuevaContrasena()));
+        var u = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + id));
+
+        // 1) Validar actual
+        if (!passwordEncoder.matches(dto.getContrasenaActual(), u.getContrasenaHash())) {
+            throw new IllegalArgumentException("Contraseña actual incorrecta");
+        }
+
+        // 2) Reglas mínimas (ajusta a tu gusto)
+        var nueva = dto.getNuevaContrasena();
+        if (nueva == null || nueva.isBlank()) {
+            throw new IllegalArgumentException("La nueva contraseña es obligatoria");
+        }
+        if (nueva.length() < 8) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 8 caracteres");
+        }
+        // evitar igual a la actual
+        if (passwordEncoder.matches(nueva, u.getContrasenaHash())) {
+            throw new IllegalArgumentException("La nueva contraseña no puede ser igual a la actual");
+        }
+        // (opcional) verificar confirmarContrasena si la usas en el DTO:
+        // if (dto.getConfirmarContrasena() != null && !nueva.equals(dto.getConfirmarContrasena())) {
+        //     throw new IllegalArgumentException("La confirmación no coincide");
+        // }
+
+        // 3) Guardar
+        u.setContrasenaHash(passwordEncoder.encode(nueva));
         repo.save(u);
     }
 
     @Transactional
     public UsuarioRespuestaDTO asignarRoles(Long idUsuario, UsuarioAsignarRolesDTO dto) {
-        var u = repo.findById(idUsuario).orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + idUsuario));
+        var u = repo.findById(idUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + idUsuario));
 
-        // reemplaza asignaciones
-        userRolRepo.deleteByIdUsuario(idUsuario);
-        for (Long idRol : dto.getRolesIds()) {
-            var rol = rolRepo.findById(idRol).orElseThrow(() -> new IllegalArgumentException("Rol no encontrado: " + idRol));
-            userRolRepo.save(UsuarioRol.builder()
-                    .idUsuario(idUsuario)
-                    .idRol(rol.getIdRol())
-                    .build());
+        // 1) normaliza entrada: acepta rolesIds o roles; filtra nulls y dedup
+        List<Long> roles = dto.getRolesIds();
+        if (roles == null || roles.isEmpty()) {
+            // por si el DTO se llama distinto (roles)
+            try {
+                var m = dto.getClass().getMethod("getRoles");
+                Object val = m.invoke(dto);
+                if (val instanceof List<?> l) {
+                    roles = l.stream().filter(Objects::nonNull).map(x -> (Long) x).collect(Collectors.toList());
+                }
+            } catch (Exception ignored) {}
         }
+        if (roles == null) roles = List.of();
+        roles = roles.stream().filter(Objects::nonNull).distinct().toList();
+
+        // 2) limpia asignaciones actuales del usuario
+        userRolRepo.deleteByIdUsuario(idUsuario);
+
+        // 3) inserta nuevas (con safe-guard contra duplicados)
+        for (Long idRol : roles) {
+            // valida que exista el rol
+            rolRepo.findById(idRol)
+                    .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado: " + idRol));
+
+            if (!userRolRepo.existsByIdUsuarioAndIdRol(idUsuario, idRol)) {
+                userRolRepo.save(UsuarioRol.builder()
+                        .idUsuario(idUsuario)
+                        .idRol(idRol)
+                        .build());
+            }
+        }
+
         return toDTOConRoles(u);
     }
 
@@ -138,6 +188,7 @@ public class UsuarioServicio {
                 .roles(rolesMini)
                 .build();
     }
+
     @Transactional
     public void cambiarEstado(Long id, boolean activo) {
         var u = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + id));

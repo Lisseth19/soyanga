@@ -17,27 +17,27 @@ public interface UsuarioRepositorio extends BaseRepository<Usuario, Long> {
 
     @Query(value = """
         SELECT 
-          u.id_usuario           AS idUsuario,
-          u.nombre_completo      AS nombreCompleto,
-          u.correo_electronico   AS correoElectronico,
-          u.telefono             AS telefono,
-          u.nombre_usuario       AS nombreUsuario,
-          u.estado_activo        AS estadoActivo
+          u.id_usuario         AS idUsuario,
+          u.nombre_completo    AS nombreCompleto,
+          u.correo_electronico AS correoElectronico,
+          u.telefono           AS telefono,
+          u.nombre_usuario     AS nombreUsuario,
+          u.estado_activo      AS estadoActivo
         FROM usuarios u
-        WHERE (:q IS NULL
-               OR u.nombre_completo    ILIKE CONCAT('%', CAST(:q AS TEXT), '%')
-               OR u.correo_electronico ILIKE CONCAT('%', CAST(:q AS TEXT), '%')
-               OR u.nombre_usuario     ILIKE CONCAT('%', CAST(:q AS TEXT), '%'))
+        WHERE (COALESCE(:q,'') = ''
+               OR u.nombre_completo    ILIKE CONCAT('%', :q, '%')
+               OR u.correo_electronico ILIKE CONCAT('%', :q, '%')
+               OR u.nombre_usuario     ILIKE CONCAT('%', :q, '%'))
           AND (:soloActivos = FALSE OR u.estado_activo = TRUE)
         ORDER BY u.nombre_completo ASC, u.id_usuario ASC
         """,
             countQuery = """
         SELECT COUNT(*)
         FROM usuarios u
-        WHERE (:q IS NULL
-               OR u.nombre_completo    ILIKE CONCAT('%', CAST(:q AS TEXT), '%')
-               OR u.correo_electronico ILIKE CONCAT('%', CAST(:q AS TEXT), '%')
-               OR u.nombre_usuario     ILIKE CONCAT('%', CAST(:q AS TEXT), '%'))
+        WHERE (COALESCE(:q,'') = ''
+               OR u.nombre_completo    ILIKE CONCAT('%', :q, '%')
+               OR u.correo_electronico ILIKE CONCAT('%', :q, '%')
+               OR u.nombre_usuario     ILIKE CONCAT('%', :q, '%'))
           AND (:soloActivos = FALSE OR u.estado_activo = TRUE)
         """,
             nativeQuery = true)
@@ -45,23 +45,25 @@ public interface UsuarioRepositorio extends BaseRepository<Usuario, Long> {
                                           @Param("soloActivos") boolean soloActivos,
                                           Pageable pageable);
 
-
     @Query(value = """
         SELECT r.nombre_rol
         FROM roles r
         JOIN usuarios_roles ur ON ur.id_rol = r.id_rol
         WHERE ur.id_usuario = :idUsuario
-          AND (r.estado_activo IS NULL OR r.estado_activo = TRUE)
+          AND r.estado_activo = TRUE
+        ORDER BY r.nombre_rol ASC
         """, nativeQuery = true)
     List<String> rolesDeUsuario(@Param("idUsuario") Long idUsuario);
 
     @Query(value = """
-        SELECT p.nombre_permiso
-        FROM permisos p
-        JOIN roles_permisos rp ON rp.id_permiso = p.id_permiso
-        JOIN usuarios_roles ur ON ur.id_rol = rp.id_rol
-        WHERE ur.id_usuario = :idUsuario
-          AND (p.estado_activo IS NULL OR p.estado_activo = TRUE)
+        SELECT DISTINCT p.nombre_permiso
+        FROM usuarios u
+        JOIN usuarios_roles ur ON ur.id_usuario = u.id_usuario
+        JOIN roles r           ON r.id_rol = ur.id_rol AND r.estado_activo = TRUE
+        JOIN roles_permisos rp ON rp.id_rol = r.id_rol
+        JOIN permisos p        ON p.id_permiso = rp.id_permiso AND p.estado_activo = TRUE
+        WHERE u.id_usuario = :idUsuario
+        ORDER BY p.nombre_permiso ASC
         """, nativeQuery = true)
     List<String> permisosDeUsuario(@Param("idUsuario") Long idUsuario);
 }

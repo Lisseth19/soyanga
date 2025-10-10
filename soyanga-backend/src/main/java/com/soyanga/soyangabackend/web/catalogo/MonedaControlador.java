@@ -3,35 +3,37 @@ package com.soyanga.soyangabackend.web.catalogo;
 import com.soyanga.soyangabackend.dto.catalogo.*;
 import com.soyanga.soyangabackend.servicio.catalogo.MonedaServicio;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 @RequestMapping("/api/v1/catalogo/monedas")
+@RequiredArgsConstructor
+@PreAuthorize("@perms.tiene(authentication, 'monedas:ver')") // lectura por defecto
 public class MonedaControlador {
 
     private final MonedaServicio servicio;
-    public MonedaControlador(MonedaServicio servicio) { this.servicio = servicio; }
 
     // Listado paginado con búsqueda/orden/filtro de activos
     @GetMapping
     public Page<MonedaDTO> listar(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Boolean activos,
-            @PageableDefault(size = 20, sort = "nombreMoneda", direction = Sort.Direction.ASC)
-            Pageable pageable
+            @PageableDefault(size = 20, sort = "nombreMoneda") Pageable pageable
     ) {
         return servicio.listar(q, activos, pageable);
     }
 
-    // Solo NO locales con su TC (para Postman)
+    // Solo NO locales con su TC
     @GetMapping("/no-locales")
     public List<MonedaDTO> listarNoLocalesConTC(
             @RequestParam(required = false) Boolean activos,
@@ -48,16 +50,19 @@ public class MonedaControlador {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@perms.tiene(authentication, 'monedas:crear')")
     public MonedaDTO crear(@Valid @RequestBody MonedaCrearDTO dto) {
         return servicio.crear(dto);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@perms.tiene(authentication, 'monedas:actualizar')")
     public MonedaDTO actualizar(@PathVariable Long id, @Valid @RequestBody MonedaActualizarDTO dto) {
         return servicio.actualizar(id, dto);
     }
 
     @PatchMapping("/{id}/estado")
+    @PreAuthorize("@perms.tiene(authentication, 'monedas:actualizar')")
     public MonedaDTO cambiarEstado(@PathVariable Long id, @RequestParam boolean activo) {
         return servicio.cambiarEstado(id, activo);
     }
@@ -65,6 +70,7 @@ public class MonedaControlador {
     // "Eliminar" = inhabilitar si no es local
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perms.tiene(authentication, 'monedas:eliminar')")
     public void eliminar(@PathVariable Long id) {
         servicio.eliminar(id);
     }

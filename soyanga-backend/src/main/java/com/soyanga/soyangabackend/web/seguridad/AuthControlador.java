@@ -1,8 +1,11 @@
 package com.soyanga.soyangabackend.web.seguridad;
 
-import com.soyanga.soyangabackend.dto.seguridad.*;
+import com.soyanga.soyangabackend.dto.seguridad.AuthLoginDTO;
+import com.soyanga.soyangabackend.dto.seguridad.AuthTokensDTO;
+import com.soyanga.soyangabackend.dto.seguridad.PerfilDTO;
 import com.soyanga.soyangabackend.servicio.seguridad.AuthServicio;
 import jakarta.validation.Valid;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -18,18 +21,27 @@ public class AuthControlador {
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.OK)
     public AuthTokensDTO login(@Valid @RequestBody AuthLoginDTO dto) {
+        // El servicio autentica y construye AuthTokensDTO (tokenType, accessToken, expiresIn, refreshToken)
         return servicio.login(dto);
     }
 
     @PostMapping("/refresh")
-    public AuthTokensDTO refresh(@RequestBody String refreshToken) {
-        // puedes enviar como { "refreshToken": "..." } si prefieres un DTO
-        String token = refreshToken.replace("\"", "").trim();
-        return servicio.refresh(token);
+    @ResponseStatus(HttpStatus.OK)
+    public AuthTokensDTO refresh(@RequestBody RefreshTokenRequest body) {
+        // Acepta JSON: { "refreshToken": "..." }
+        return servicio.refresh(body.getRefreshToken());
     }
 
     @GetMapping("/me")
+    @ResponseStatus(HttpStatus.OK)
     public PerfilDTO me(Authentication auth) {
+        // Devuelve perfil del usuario autenticado
         return servicio.perfil(auth.getName());
+    }
+
+    // DTO simple para /refresh
+    @Data
+    public static class RefreshTokenRequest {
+        private String refreshToken;
     }
 }
