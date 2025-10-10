@@ -24,6 +24,8 @@ import PermisosPage from "@/paginas/seguridad/Permisos";
 
 import UnidadesPage from '@/paginas/catalogo/Unidades'
 import PresentacionesPage from '@/paginas/catalogo/Presentaciones'
+import ClientesPage from '@/paginas/cliente/Clientes'
+import ProveedoresPage from '@/paginas/proveedor/Proveedores'
 
 
 export const router = createBrowserRouter([
@@ -39,20 +41,21 @@ export const router = createBrowserRouter([
         ),
         children: [
 
-            { path: '/', element: <Inicio /> },
-            { path: '/salud', element: <SaludAPI /> },
-            { path: '/inventario/por-lote', element: <InventarioPorLotePage /> },
+            { path: "/inicio", element: <Inicio /> },
+            { path: "/salud", element: <SaludAPI /> },
+            { path: "/inventario/por-lote", element: <InventarioPorLotePage /> },
+
             { path: "/sucursales", element: <SucursalesList /> },
             { path: "/sucursales/nueva", element: <NuevaSucursal /> },
             { path: "/sucursales/:id", element: <EditarSucursal /> },
             { path: '/catalogo/almacenes', element: <AlmacenesPage /> },
             { path: '/catalogo/categorias', element: <CategoriasPage /> },
             { path: '/catalogo/monedas', element: <MonedasPage /> },
-            { path: "clientes", element: <ClientesPage /> },
+            { path: "/clientes", element: <ClientesPage /> },
             { path: '/proveedores', element: <ProveedoresPage /> },
             { path: '/inventario/productos', element: <ProductosPage /> },
             { path: '/catalogo/unidades', element: <UnidadesPage /> },
-      
+
             { path: "/catalogo/presentaciones", element: <PresentacionesPage /> },
             { path: "/seguridad", element: <Navigate to="/seguridad/usuarios" replace /> },
             { path: "/seguridad/usuarios", element: <UsuariosPage /> },

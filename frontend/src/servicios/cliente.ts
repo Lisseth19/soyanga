@@ -1,81 +1,74 @@
-import type { Cliente } from "../types/cliente";
-import type { Page } from "../types/pagination";
+import { http } from "./httpClient";
+import type { Page } from "@/types/pagination";
+import type {
+    Cliente,
+    ClienteCrearDTO,
+    ClienteEditarDTO,
+    ClienteEstadoDTO,
+} from "@/types/cliente";
 
-// Usa proxy de Vite ("/api") o variable de entorno si la tienes
-const API_BASE = (import.meta as any).env?.VITE_API_URL ?? ""; // ej: "http://localhost:8080"
-const BASE = `${API_BASE}/api/v1/clientes`;
+const BASE = "/v1/clientes";
 
-function qs(params: Record<string, unknown>) {
-    const sp = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== "") sp.append(k, String(v));
-    });
-    const s = sp.toString();
-    return s ? `?${s}` : "";
+export interface ClientesFiltro {
+    q?: string;
+    page?: number;
+    size?: number;
+    soloActivos?: boolean;
+    sort?: string;
 }
 
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(url, {
-        headers: { "Content-Type": "application/json" },
-        ...init,
-    });
-
-    // Si la respuesta no es OK, intenta leer texto para mostrar mensaje útil
-    if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `HTTP ${res.status} ${res.statusText}`);
-    }
-
-    // 204/205 o sin cuerpo
-    if (res.status === 204 || res.status === 205) {
-        // @ts-expect-error: intencional para endpoints sin cuerpo
-        return undefined;
-    }
-
-    // Solo parsea JSON si el content-type lo indica
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) {
-        return (await res.json()) as T;
-    } else {
-        const text = await res.text();
-        // Si vino HTML, probablemente pegaste al index.html del frontend (proxy/URL mal)
-        if (text.trim().startsWith("<!doctype") || text.trim().startsWith("<html")) {
-            throw new Error(
-                "El servidor devolvió HTML (¿ruta / proxy incorrecto?). Revisa la URL del API o el proxy de Vite."
-            );
-        }
-        // Si no es HTML, intenta parsear como JSON por si el servidor no setea bien el header
-        try {
-            return JSON.parse(text) as T;
-        } catch {
-            throw new Error("Respuesta no-JSON del servidor: " + text.slice(0, 200));
-        }
-    }
+/**
+ * Helpers de mapeo -> ajusta si tu backend usa otros nombres:
+ * - razonSocialONombre: algunos backends esperan "razonSocial" o "nombreCliente".
+ * - limiteCreditoBob: asegúrate de enviar number (no string).
+ */
+function toBackendCrear(dto: ClienteCrearDTO | any) {
+    return {
+        // alias comunes: razonSocial, nombreCliente, nombre
+        razonSocialONombre: (dto?.razonSocialONombre ?? dto?.razonSocial ?? dto?.nombreCliente ?? dto?.nombre ?? "").trim(),
+        nit: dto?.nit?.trim?.() ?? null,
+        telefono: dto?.telefono?.trim?.() ?? null,
+        correoElectronico: dto?.correoElectronico?.trim?.() ?? null,
+        direccion: dto?.direccion?.trim?.() ?? null,
+        ciudad: dto?.ciudad?.trim?.() ?? null,
+        condicionDePago: dto?.condicionDePago ?? null, // "contado" | "credito"
+        limiteCreditoBob:
+            dto?.limiteCreditoBob != null && dto?.limiteCreditoBob !== ""
+                ? Number(dto.limiteCreditoBob)
+                : null,
+        estadoActivo: dto?.estadoActivo ?? true,
+    };
 }
 
-export function listarClientes(opts?: { q?: string; page?: number; size?: number; soloActivos?: boolean }) {
-    const query = qs({
-        q: opts?.q,
-        page: opts?.page ?? 0,
-        size: opts?.size ?? 20,
-        soloActivos: opts?.soloActivos ?? false,
-    });
-    return fetchJson<Page<Cliente>>(`${BASE}${query}`);
+function toBackendEditar(dto: ClienteEditarDTO | any) {
+    const base = toBackendCrear(dto);
+    // en edición no fuerces estadoActivo si no viene
+    if (dto?.estadoActivo === undefined) delete base.estadoActivo;
+    return base;
 }
 
-export function obtenerCliente(id: number) {
-    return fetchJson<Cliente>(`${BASE}/${id}`);
-}
+export const ClienteService = {
+    listar: (params: ClientesFiltro = {}) =>
+        http.get<Page<Cliente>>(BASE, {
+            params: {
+                q: params.q,
+                page: params.page ?? 0,
+                size: params.size ?? 20,
+                soloActivos: params.soloActivos ?? false,
+                ...(params.sort ? { sort: params.sort } : {}),
+            },
+        }),
 
-export function crearCliente(dto: Omit<Cliente, "idCliente">) {
-    return fetchJson<Cliente>(BASE, { method: "POST", body: JSON.stringify(dto) });
-}
+    obtener: (id: number) => http.get<Cliente>(`${BASE}/${id}`),
 
-// Algunos backends devuelven 204 en PUT/DELETE; el parser anterior ya lo tolera
-export function editarCliente(id: number, dto: Partial<Omit<Cliente, "idCliente">>) {
-    return fetchJson<Cliente>(`${BASE}/${id}`, { method: "PUT", body: JSON.stringify(dto) });
-}
+    crear: (dto: ClienteCrearDTO) =>
+        http.post<Cliente, any>(BASE, toBackendCrear(dto)),
 
-export function eliminarCliente(id: number) {
-    return fetchJson<void>(`${BASE}/${id}`, { method: "DELETE" });
-}
+    editar: (id: number, dto: ClienteEditarDTO) =>
+        http.put<Cliente, any>(`${BASE}/${id}`, toBackendEditar(dto)),
+
+    eliminar: (id: number) => http.del<void>(`${BASE}/${id}`),
+
+    cambiarEstado: (id: number, dto: ClienteEstadoDTO) =>
+        http.patch<Cliente, ClienteEstadoDTO>(`${BASE}/${id}/estado`, dto),
+};

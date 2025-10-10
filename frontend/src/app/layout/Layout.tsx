@@ -91,8 +91,9 @@ export default function AppLayout() {
               {can("categorias:ver")     && <NavLink to="/catalogo/categorias" className={navClass}>Categorías</NavLink>}
               {can("monedas:ver")        && <NavLink to="/catalogo/monedas" className={navClass}>Monedas</NavLink>}
               {can("productos:ver")      && <NavLink to="/inventario/productos" className={navClass}>Productos</NavLink>}
+              {can("clientes:ver")      && <NavLink to="/clientes" className={navClass}>Clientes</NavLink>}
+              {can("proveedores:ver")      && <NavLink to="/proveedores" className={navClass}>Proveedores</NavLink>}
               {/* Si API Health debe ser público, deja este sin can() */}
-              <NavLink to="/salud" className={navClass}>API Health</NavLink>
 
               {/* Seguridad */}
               {(can("usuarios:ver") || can("roles:ver") || can("permisos:ver")) && (
@@ -102,6 +103,7 @@ export default function AppLayout() {
                     {can("permisos:ver") && <NavLink to="/seguridad/permisos" className={navClass}>Permisos</NavLink>}
                   </>
               )}
+              <NavLink to="/salud" className={navClass}>API Health</NavLink>
             </div>
 
             {/* Spacer */}

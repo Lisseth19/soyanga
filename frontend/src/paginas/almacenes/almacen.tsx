@@ -50,16 +50,12 @@ export default function AlmacenesPage() {
       [editando]
   );
 
-  const textoBoton = useMemo(
-    () => (editando ? "Guardar Cambios" : "Agregar Almacén"),
-    [editando]
-  );
-
-
   // ====== helpers ======
   function show403() {
     alert("No tienes permiso para realizar esta acción.");
   }
+  const sucursalNombre = (id: number) =>
+      sucursales.find((s) => s.id === id)?.nombre ?? id;
 
   // ====== cargar combos ======
   useEffect(() => {
@@ -75,9 +71,6 @@ export default function AlmacenesPage() {
   }, []);
 
   // ====== listar ======
-  const sucursalNombre = (id: number) =>
-    sucursales.find((s) => s.id === id)?.nombre ?? id;
-
   async function fetchList() {
     setLoading(true);
     setErr(null);
@@ -91,11 +84,8 @@ export default function AlmacenesPage() {
       });
       setPage(p);
     } catch (e: any) {
-      if (e?.status === 403) {
-        setErr("Acceso denegado.");
-      } else {
-        setErr(e?.message || "Error cargando almacenes.");
-      }
+      if (e?.status === 403) setErr("Acceso denegado.");
+      else setErr(e?.message || "Error cargando almacenes.");
     } finally {
       setLoading(false);
     }
@@ -198,36 +188,30 @@ export default function AlmacenesPage() {
     }
   }
 
-  // icono
-  const SearchIcon = () => (
-      <svg width="16" height="16" viewBox="0 0 24 24" className="text-neutral-400">
-        <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.71.71l.27.28v.79L20 21.49 21.49 20 15.5 14zM10 15a5 5 0 110-10 5 5 0 010 10z" fill="currentColor" />
-      </svg>
-  );
-
   return (
       <div className="p-6">
         <h1 className="text-2xl font-semibold mb-4">Gestión de Almacenes</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna izquierda: filtros + tabla */}
+          {/* LISTA (2/3) */}
           <div className="lg:col-span-2">
             {/* Filtros */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-              <label className="inline-flex items-center gap-2">
+              <label className="inline-flex items-center gap-2 text-sm text-neutral-700">
                 <input
                     type="checkbox"
                     className="accent-emerald-600"
                     checked={mostrarInactivos}
                     onChange={(e) => setMostrarInactivos(e.target.checked)}
                 />
-                <span className="text-sm text-neutral-700">Mostrar almacenes inactivos</span>
+                Mostrar inactivos
               </label>
 
               <div className="relative w-full sm:w-80">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2">
-                <SearchIcon />
-              </span>
+                <Search
+                    size={18}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+                />
                 <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
@@ -235,236 +219,206 @@ export default function AlmacenesPage() {
                     className="h-10 w-full pl-9 pr-3 rounded-lg border border-neutral-300"
                 />
               </div>
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-4">Gestión de Almacenes</h1>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LISTA (2/3) */}
-        <div className="lg:col-span-2">
-          {/* Filtros */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <label className="inline-flex items-center gap-2 text-sm text-neutral-700">
-              <input
-                type="checkbox"
-                className="accent-emerald-600"
-                checked={mostrarInactivos}
-                onChange={(e) => setMostrarInactivos(e.target.checked)}
-              />
-              Mostrar inactivos
-            </label>
-
-            <div className="relative w-full sm:w-80">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-              />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar almacén…"
-                className="h-10 w-full pl-9 pr-3 rounded-lg border border-neutral-300"
-              />
             </div>
 
-          {/* Errores / loading */}
-          {err && <div className="text-red-600 mb-3">Error: {err}</div>}
-          {loading && !err && <div className="mb-3">Cargando…</div>}
+            {/* Errores / loading */}
+            {err && <div className="text-red-600 mb-3">Error: {err}</div>}
+            {loading && !err && <div className="mb-3">Cargando…</div>}
 
-          {/* Encabezado (md+) */}
-          {!loading && !err && (
-            <div className="hidden md:grid w-full grid-cols-[1.1fr_0.9fr_1.6fr_0.6fr_120px] items-center text-xs uppercase text-neutral-500 px-3">
-              <div>Almacén</div>
-              <div>Sucursal</div>
-              <div>Descripción</div>
-              <div>Estado</div>
-              <div className="text-right pr-1">Acciones</div>
-            </div>
-          )}
+            {/* Encabezado (md+) */}
+            {!loading && !err && (
+                <div className="hidden md:grid w-full grid-cols-[1.1fr_0.9fr_1.6fr_0.6fr_120px] items-center text-xs uppercase text-neutral-500 px-3">
+                  <div>Almacén</div>
+                  <div>Sucursal</div>
+                  <div>Descripción</div>
+                  <div>Estado</div>
+                  <div className="text-right pr-1">Acciones</div>
+                </div>
+            )}
 
-          {/* Tarjetas / filas */}
-          {!loading && !err && (
-            <div className="mt-2 space-y-3">
-              {page?.content?.length ? (
-                page.content.map((a) => (
-                  <div
-                    key={a.idAlmacen}
-                    className={
-                      "grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr_1.6fr_0.6fr_120px] items-start md:items-center gap-2 bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition " +
-                      (!a.estadoActivo ? "opacity-60" : "")
-                    }
-                  >
-                    {/* Nombre */}
-                    <div className="font-semibold text-neutral-800 break-words">
+            {/* Tarjetas / filas */}
+            {!loading && !err && (
+                <div className="mt-2 space-y-3">
+                  {page?.content?.length ? (
+                      page.content.map((a) => (
+                          <div
+                              key={a.idAlmacen}
+                              className={
+                                  "grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr_1.6fr_0.6fr_120px] items-start md:items-center gap-2 bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition " +
+                                  (!a.estadoActivo ? "opacity-60" : "")
+                              }
+                          >
+                            {/* Nombre */}
+                            <div className="font-semibold text-neutral-800 break-words">
                       <span className="md:hidden block text-[11px] uppercase text-neutral-500 mb-1">
                         Almacén
                       </span>
-                      {a.nombreAlmacen}
-                    </div>
+                              {a.nombreAlmacen}
+                            </div>
 
-                    {/* Sucursal */}
-                    <div className="text-neutral-800">
+                            {/* Sucursal */}
+                            <div className="text-neutral-800">
                       <span className="md:hidden block text-[11px] uppercase text-neutral-500 mb-1">
                         Sucursal
                       </span>
-                      {sucursalNombre(a.idSucursal)}
-                    </div>
+                              {sucursalNombre(a.idSucursal)}
+                            </div>
 
-                    {/* Descripción */}
-                    <div className="text-neutral-800 break-words">
+                            {/* Descripción */}
+                            <div className="text-neutral-800 break-words">
                       <span className="md:hidden block text-[11px] uppercase text-neutral-500 mb-1">
                         Descripción
                       </span>
-                      {a.descripcion || "—"}
-                    </div>
+                              {a.descripcion || "—"}
+                            </div>
 
-                    {/* Estado */}
-                    <div className="text-neutral-800">
+                            {/* Estado */}
+                            <div className="text-neutral-800">
                       <span className="md:hidden block text-[11px] uppercase text-neutral-500 mb-1">
                         Estado
                       </span>
-                      {a.estadoActivo ? "Activo" : "Inactivo"}
-                    </div>
+                              {a.estadoActivo ? "Activo" : "Inactivo"}
+                            </div>
 
-                    {/* Acciones con íconos */}
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        aria-label="Editar"
-                        title="Editar"
-                        onClick={() => onEditar(a)}
-                        className="p-2 rounded-md hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
-                      >
-                        <Pencil size={18} />
-                      </button>
+                            {/* Acciones (protegidas por permiso) */}
+                            <div className="flex items-center justify-end gap-1">
+                              {can("almacenes:actualizar") && (
+                                  <button
+                                      aria-label="Editar"
+                                      title="Editar"
+                                      onClick={() => onEditar(a)}
+                                      className="p-2 rounded-md hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
+                                  >
+                                    <Pencil size={18} />
+                                  </button>
+                              )}
 
-                      {a.estadoActivo ? (
-                        <button
-                          aria-label="Desactivar"
-                          title="Desactivar"
-                          onClick={() => onToggleActivo(a)}
-                          className="p-2 rounded-md hover:bg-neutral-100 text-rose-600 hover:text-rose-700"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      ) : (
-                        <button
-                          aria-label="Activar"
-                          title="Activar"
-                          onClick={() => onToggleActivo(a)}
-                          className="p-2 rounded-md hover:bg-neutral-100 text-emerald-600 hover:text-emerald-700"
-                        >
-                          <CheckCircle2 size={18} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center text-neutral-500 py-10 bg-white rounded-xl">
-                  Sin registros
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                              {can("almacenes:actualizar") &&
+                                  (a.estadoActivo ? (
+                                      <button
+                                          aria-label="Desactivar"
+                                          title="Desactivar"
+                                          onClick={() => onToggleActivo(a)}
+                                          className="p-2 rounded-md hover:bg-neutral-100 text-rose-600 hover:text-rose-700"
+                                      >
+                                        <Trash2 size={18} />
+                                      </button>
+                                  ) : (
+                                      <button
+                                          aria-label="Activar"
+                                          title="Activar"
+                                          onClick={() => onToggleActivo(a)}
+                                          className="p-2 rounded-md hover:bg-neutral-100 text-emerald-600 hover:text-emerald-700"
+                                      >
+                                        <CheckCircle2 size={18} />
+                                      </button>
+                                  ))}
 
-        {/* FORM (1/3) */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4">
-            <div className="bg-white border rounded-xl p-4">
-              <h2 className="text-lg font-semibold mb-2">{tituloForm}</h2>
-              <form className="space-y-3" onSubmit={onSubmit}>
-                <div>
-                  <label className="block text-sm text-neutral-700 mb-1">
-                    Sucursal
-                  </label>
-                  <select
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={form.idSucursal}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        idSucursal: Number(e.target.value),
-                      }))
-                    }
-                    disabled={cargandoSuc}
-                  >
-                    <option value={0} disabled>
-                      Selecciona una sucursal…
-                    </option>
-                    {sucursales.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nombre}
-                      </option>
-                    ))}
-                  </select>
+                              {can("almacenes:eliminar") && (
+                                  <button
+                                      aria-label="Eliminar"
+                                      title="Eliminar"
+                                      onClick={() => onDelete(a)}
+                                      className="p-2 rounded-md hover:bg-neutral-100 text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                              )}
+                            </div>
+                          </div>
+                      ))
+                  ) : (
+                      <div className="text-center text-neutral-500 py-10 bg-white rounded-xl">
+                        Sin registros
+                      </div>
+                  )}
                 </div>
             )}
           </div>
 
-                <div>
-                  <label className="block text-sm text-neutral-700 mb-1">
-                    Nombre
-                  </label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={form.nombreAlmacen}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, nombreAlmacen: e.target.value }))
-                    }
-                    placeholder="p. ej., Almacén Central"
-                  />
-                </div>
+          {/* FORM (1/3) */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-4">
+              <div className="bg-white border rounded-xl p-4">
+                <h2 className="text-lg font-semibold mb-2">{tituloForm}</h2>
 
-                <div>
-                  <label className="block text-sm text-neutral-700 mb-1">
-                    Descripción
-                  </label>
-                  <textarea
-                    className="w-full border rounded-lg px-3 py-2 min-h-[80px]"
-                    value={form.descripcion || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, descripcion: e.target.value }))
-                    }
-                    placeholder="Opcional"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-neutral-700 mb-1">
-                    Estado
-                  </label>
-                  <select
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={form.estadoActivo ? "si" : "no"}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        estadoActivo: e.target.value === "si",
-                      }))
-                    }
-                  >
-                    <option value="si">Activo</option>
-                    <option value="no">Inactivo</option>
-                  </select>
-                </div>
+                {/* Si NO puede crear y no está editando, muestra aviso genérico */}
+                {!editando && !can("almacenes:crear") ? (
+                    <div className="text-sm text-neutral-600">
+                      No tienes permiso para realizar esta acción.
+                    </div>
+                ) : (
+                    <form className="space-y-3" onSubmit={onSubmit}>
+                      <div>
+                        <label className="block text-sm text-neutral-700 mb-1">
+                          Sucursal
+                        </label>
+                        <select
+                            className="w-full border rounded-lg px-3 py-2"
+                            value={form.idSucursal}
+                            onChange={(e) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  idSucursal: Number(e.target.value),
+                                }))
+                            }
+                            disabled={cargandoSuc}
+                        >
+                          <option value={0} disabled>
+                            Selecciona una sucursal…
+                          </option>
+                          {sucursales.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.nombre}
+                              </option>
+                          ))}
+                        </select>
+                      </div>
 
                       <div>
-                        <label className="block text-sm text-neutral-700 mb-1">Descripción</label>
+                        <label className="block text-sm text-neutral-700 mb-1">
+                          Nombre
+                        </label>
+                        <input
+                            className="w-full border rounded-lg px-3 py-2"
+                            value={form.nombreAlmacen}
+                            onChange={(e) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  nombreAlmacen: e.target.value,
+                                }))
+                            }
+                            placeholder="p. ej., Almacén Central"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-neutral-700 mb-1">
+                          Descripción
+                        </label>
                         <textarea
                             className="w-full border rounded-lg px-3 py-2 min-h-[80px]"
                             value={form.descripcion || ""}
-                            onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+                            onChange={(e) =>
+                                setForm((f) => ({ ...f, descripcion: e.target.value }))
+                            }
                             placeholder="Opcional"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm text-neutral-700 mb-1">Estado</label>
+                        <label className="block text-sm text-neutral-700 mb-1">
+                          Estado
+                        </label>
                         <select
                             className="w-full border rounded-lg px-3 py-2"
                             value={form.estadoActivo ? "si" : "no"}
-                            onChange={(e) => setForm((f) => ({ ...f, estadoActivo: e.target.value === "si" }))}
+                            onChange={(e) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  estadoActivo: e.target.value === "si",
+                                }))
+                            }
                         >
                           <option value="si">Activo</option>
                           <option value="no">Inactivo</option>
