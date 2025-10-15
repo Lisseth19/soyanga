@@ -26,6 +26,16 @@ export default function PresentacionesPage() {
   const [productos, setProductos] = useState<Opcion[]>([]);
   const [unidades, setUnidades] = useState<Opcion[]>([]);
 
+  const [prodFiltro, setProdFiltro] = useState(""); // texto de búsqueda en el panel derecho
+
+const productosFiltrados = useMemo(() => {
+  const q = prodFiltro.trim().toLowerCase();
+  if (!q) return productos;
+  return productos.filter(p => p.nombre.toLowerCase().includes(q));
+}, [prodFiltro, productos]);
+
+
+
   // --- INICIO: helpers de panel crear/editar ---
   const INITIAL_FORM: PresentacionCrearDTO = {
     idProducto: 0,
@@ -127,7 +137,12 @@ export default function PresentacionesPage() {
     if (file) validateAndSetFile(file);
   }
 
-
+// opcional: cuando el form ya tiene idProducto, mostramos el nombre en el buscador
+useEffect(() => {
+  if (!form.idProducto) return;
+  const m = productos.find(p => p.id === form.idProducto);
+  if (m) setProdFiltro(m.nombre);
+}, [form.idProducto, productos]);
 
 
   // ✅ cargar combos con servicios reales
@@ -252,7 +267,7 @@ export default function PresentacionesPage() {
 
             <input
               className="border rounded-lg px-3 py-2 w-full sm:flex-1"
-              placeholder="Buscar por SKU…"
+              placeholder="Buscar por Nombre o Sku"
               value={q}
               onChange={(e) => { setPage(0); setQ(e.target.value); }}
             />
@@ -454,16 +469,38 @@ export default function PresentacionesPage() {
               <h2 className="text-lg font-semibold mb-2">{tituloForm}</h2>
               <form className="space-y-3" onSubmit={onSubmit}>
                 <div>
-                  <label className="block text-sm text-neutral-700 mb-1">Producto</label>
-                  <select
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={form.idProducto}
-                    onChange={(e) => setForm(f => ({ ...f, idProducto: Number(e.target.value) }))}
-                  >
-                    <option value={0} disabled>Selecciona…</option>
-                    {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  </select>
-                </div>
+  <label className="block text-sm text-neutral-700 mb-1">Producto</label>
+
+  {/* 🔎 Buscador por nombre */}
+  <input
+    className="w-full border rounded-lg px-3 py-2 mb-2"
+    placeholder="Buscar producto por nombre…"
+    value={prodFiltro}
+    onChange={(e) => setProdFiltro(e.target.value)}
+  />
+
+  {/* Selector filtrado */}
+  <select
+    className="w-full border rounded-lg px-3 py-2"
+    value={form.idProducto > 0 ? form.idProducto : 0}
+    onChange={(e) =>
+      setForm(f => ({ ...f, idProducto: Number(e.target.value) }))
+    }
+  >
+    <option value={0} disabled>Selecciona…</option>
+    {productosFiltrados.slice(0, 100).map(p => (
+      <option key={p.id} value={p.id}>{p.nombre}</option>
+    ))}
+  </select>
+
+  {/* Hint cuando no hay resultados */}
+  {prodFiltro && productosFiltrados.length === 0 && (
+    <div className="text-xs text-amber-600 mt-1">
+      No se encontraron productos con “{prodFiltro}”.
+    </div>
+  )}
+</div>
+
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>

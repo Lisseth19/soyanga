@@ -82,6 +82,51 @@ export default function AppLayout() {
               <span className="text-emerald-700 font-semibold tracking-wide">SOYANGA</span>
             </Link>
 
+            {/* SCROLLER: tabs horizontales */}
+            <div
+              className="
+                -mx-4 px-4       /* que el scroll ocupe de borde a borde */
+                flex gap-1 min-w-0 flex-1
+                overflow-x-auto whitespace-nowrap scrollbar-none
+              "
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              <NavLink to="/inventario/por-lote" className={navClass}>
+                Inventario por lote
+              </NavLink>
+              <NavLink to="/sucursales" className={navClass}>
+                Sucursales
+              </NavLink>
+              <NavLink to="/catalogo/almacenes" className={navClass}>
+                Almacenes
+              </NavLink>
+              <NavLink to="/catalogo/categorias" className={navClass}>
+                Categorias
+              </NavLink>
+              <NavLink to="/catalogo/monedas" className={navClass}>
+                Monedas
+              </NavLink>
+              <NavLink to="/clientes" className={navClass}>
+                Clientes
+              </NavLink>
+              <NavLink to="/proveedores" className={navClass}>
+                Proveedores
+              </NavLink>
+              <NavLink to="/inventario/productos" className={navClass}>
+                Productos
+              </NavLink>
+              <NavLink to="/catalogo/unidades" className={navClass}>
+                Unidades
+              </NavLink>
+              <NavLink to="/catalogo/presentaciones" className={navClass}>Presentaciones</NavLink>
+
+              <NavLink to="/compras" className={navClass}>
+                Compras
+              </NavLink>
+
+              <NavLink to="/salud" className={navClass}>
+                API Health
+              </NavLink>
             {/* Nav principal */}
             <div className="flex items-center gap-1">
               {/* Si quieres que estos también respeten permisos, usa can("...:ver") */}

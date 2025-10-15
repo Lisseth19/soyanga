@@ -26,6 +26,12 @@ import UnidadesPage from '@/paginas/catalogo/Unidades'
 import PresentacionesPage from '@/paginas/catalogo/Presentaciones'
 import ClientesPage from '@/paginas/cliente/Clientes'
 import ProveedoresPage from '@/paginas/proveedor/Proveedores'
+import ComprasListaPage from '@/paginas/compras/ComprasLista'
+import CompraDetallePage from '@/paginas/compras/CompraDetalle'
+import CompraNuevaPage from '@/paginas/compras/CompraNueva'
+import RecepcionNuevaPage from '@/paginas/compras/RecepcionNueva'
+
+
 
 
 export const router = createBrowserRouter([
@@ -57,6 +63,12 @@ export const router = createBrowserRouter([
             { path: '/catalogo/unidades', element: <UnidadesPage /> },
 
             { path: "/catalogo/presentaciones", element: <PresentacionesPage /> },
+            { path: '/compras', element: <ComprasListaPage/> },
+            { path: '/compras/nueva', element: <CompraNuevaPage/> },
+            { path: '/compras/:id', element: <CompraDetallePage/> },
+            { path: "/compras/:id/recepciones/nueva", element: <RecepcionNuevaPage/> }
+
+            
             { path: "/seguridad", element: <Navigate to="/seguridad/usuarios" replace /> },
             { path: "/seguridad/usuarios", element: <UsuariosPage /> },
             { path: "/seguridad/roles", element: <RolesPage /> },
