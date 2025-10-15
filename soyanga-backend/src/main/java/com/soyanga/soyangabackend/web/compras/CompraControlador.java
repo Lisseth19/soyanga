@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
 
@@ -20,12 +21,11 @@ public class CompraControlador {
     public Page<CompraListadoProjection> listar(
             @RequestParam(required = false) String estado,
             @RequestParam(required = false) Long proveedorId,
-            @RequestParam(required = false) LocalDateTime desde,
-            @RequestParam(required = false) LocalDateTime hasta,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        var pageable = PageRequest.of(page, size); // el ORDER BY está en el SQL
+            @RequestParam(defaultValue = "20") int size) {
+        var pageable = PageRequest.of(page, size);
         return servicio.listar(estado, proveedorId, desde, hasta, pageable);
     }
 
@@ -41,15 +41,28 @@ public class CompraControlador {
 
     @PostMapping("/{id}/items")
     public CompraDetalleRespuestaDTO agregarItem(@PathVariable Long id,
-                                                 @Valid @RequestBody CompraDetalleCrearDTO dto) {
+            @Valid @RequestBody CompraDetalleCrearDTO dto) {
         return servicio.agregarItem(id, dto);
+    }
+
+    @PutMapping("/{id}/items/{detalleId}")
+    public CompraDetalleRespuestaDTO actualizarItem(@PathVariable Long id,
+            @PathVariable Long detalleId,
+            @RequestBody CompraDetalleActualizarDTO dto) {
+        return servicio.actualizarItem(id, detalleId, dto);
+    }
+
+    @DeleteMapping("/{id}/items/{detalleId}")
+    public void eliminarItem(@PathVariable Long id, @PathVariable Long detalleId) {
+        servicio.eliminarItem(id, detalleId);
     }
 
     @PostMapping("/{id}/estado")
     public CompraRespuestaDTO cambiarEstado(@PathVariable Long id,
-                                            @RequestParam String nuevo) {
+            @RequestParam String nuevo) {
         return servicio.cambiarEstado(id, nuevo);
     }
+
     @PostMapping("/{id}/aprobar")
     public CompraRespuestaDTO aprobar(@PathVariable Long id) {
         return servicio.cambiarEstado(id, "aprobada");

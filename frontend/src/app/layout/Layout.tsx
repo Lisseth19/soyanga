@@ -50,12 +50,12 @@ export default function AppLayout() {
               <NavLink to="/catalogo/monedas" className={navClass}>
                 Monedas
               </NavLink>
-            <NavLink to="/clientes" className={navClass}>
-              Clientes
-            </NavLink>
-            <NavLink to="/proveedores" className={navClass}>
-              Proveedores
-            </NavLink>
+              <NavLink to="/clientes" className={navClass}>
+                Clientes
+              </NavLink>
+              <NavLink to="/proveedores" className={navClass}>
+                Proveedores
+              </NavLink>
               <NavLink to="/inventario/productos" className={navClass}>
                 Productos
               </NavLink>
@@ -63,6 +63,10 @@ export default function AppLayout() {
                 Unidades
               </NavLink>
               <NavLink to="/catalogo/presentaciones" className={navClass}>Presentaciones</NavLink>
+
+              <NavLink to="/compras" className={navClass}>
+                Compras
+              </NavLink>
 
               <NavLink to="/salud" className={navClass}>
                 API Health
