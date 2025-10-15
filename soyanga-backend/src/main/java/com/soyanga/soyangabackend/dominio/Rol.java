@@ -27,5 +27,10 @@ public class Rol {
     private String descripcion;
 
     @Column(name = "estado_activo", nullable = false)
-    private Boolean estadoActivo = true; // default
+    private Boolean estadoActivo;
+
+    @PrePersist
+    public void prePersist() {
+        if (estadoActivo == null) estadoActivo = Boolean.TRUE;
+    }
 }

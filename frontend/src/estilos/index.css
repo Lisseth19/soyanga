@@ -54,8 +54,16 @@ body::-webkit-scrollbar {   /* Chrome/Safari/Opera */
   display: none;
 }
 
-/* Oculta scrollbar en navegadores comunes */
-.scrollbar-none::-webkit-scrollbar { display: none; }
-.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+/* movimiento suave de burbujas */
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-6px); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
 
-
+/* entrada del toast */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.toast-in { animation: toast-in 180ms ease-out both; }

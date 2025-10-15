@@ -5,11 +5,14 @@ import com.soyanga.soyangabackend.servicio.proveedores.ProveedorServicio;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/proveedores")
 @RequiredArgsConstructor
+@PreAuthorize("@perms.tiene(authentication, 'proveedores:ver')")
 public class ProveedorControlador {
 
     private final ProveedorServicio servicio;
@@ -21,7 +24,7 @@ public class ProveedorControlador {
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "20") int size
     ) {
-        var pageable = PageRequest.of(page, size); // sin Sort: ORDER BY está en el SQL
+        var pageable = PageRequest.of(page, size); // ORDER BY ya está en tu SQL
         return servicio.listar(q, soloActivos, pageable);
     }
 
@@ -31,16 +34,21 @@ public class ProveedorControlador {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@perms.tiene(authentication, 'proveedores:crear')")
     public ProveedorRespuestaDTO crear(@Valid @RequestBody ProveedorCrearDTO dto) {
         return servicio.crear(dto);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@perms.tiene(authentication, 'proveedores:actualizar')")
     public ProveedorRespuestaDTO editar(@PathVariable Long id, @Valid @RequestBody ProveedorEditarDTO dto) {
         return servicio.editar(id, dto);
     }
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perms.tiene(authentication, 'proveedores:eliminar')")
     public void eliminar(@PathVariable Long id) {
         servicio.eliminar(id);
     }

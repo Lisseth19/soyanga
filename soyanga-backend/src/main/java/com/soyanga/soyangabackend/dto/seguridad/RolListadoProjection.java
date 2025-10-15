@@ -4,4 +4,5 @@ public interface RolListadoProjection {
     Long getIdRol();
     String getNombreRol();
     String getDescripcion();
+    Boolean getEstadoActivo();
 }
