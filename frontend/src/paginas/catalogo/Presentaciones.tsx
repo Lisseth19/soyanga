@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { presentacionService } from "@/servicios/presentacion";
 import type { Page, PresentacionDTO, PresentacionCrearDTO } from "@/types/presentacion";
-import { Pencil, Trash2, ImageUp, CheckCircle2 } from "lucide-react"; // ← íconos
-// ✅ usa tus servicios reales de opciones
+import { Pencil, Trash2, ImageUp, CheckCircle2 } from "lucide-react";
+//  usa tus servicios reales de opciones
 import { opcionesProductos } from "@/servicios/producto";
 import { unidadService } from "@/servicios/unidad";
 
@@ -15,7 +15,7 @@ export default function PresentacionesPage() {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(10);
   const [sort, setSort] = useState("codigoSku,asc");
-  const [soloActivos, setSoloActivos] = useState(true); // ← NUEVO, por defecto marcado
+  const [soloActivos, setSoloActivos] = useState(true);
 
   // datos
   const [data, setData] = useState<Page<PresentacionDTO> | null>(null);
@@ -26,7 +26,7 @@ export default function PresentacionesPage() {
   const [productos, setProductos] = useState<Opcion[]>([]);
   const [unidades, setUnidades] = useState<Opcion[]>([]);
 
-  // --- INICIO: helpers de panel crear/editar ---
+  // --- helpers de panel crear/editar ---
   const INITIAL_FORM: PresentacionCrearDTO = {
     idProducto: 0,
     idUnidad: 0,
@@ -40,7 +40,6 @@ export default function PresentacionesPage() {
   // ref del input file del FORM (no confundir con fileInputRef de las filas)
   const formFileRef = useRef<HTMLInputElement>(null);
 
-  // función para resetear completamente el panel
   function resetPanel() {
     setEditando(null);
     setForm(INITIAL_FORM);
@@ -48,12 +47,9 @@ export default function PresentacionesPage() {
     setPreview(null);
     if (formFileRef.current) formFileRef.current.value = "";
   }
-  // --- FIN: helpers de panel crear/editar ---
-
 
   // form
   const [form, setForm] = useState<PresentacionCrearDTO>(INITIAL_FORM);
-
   const [editando, setEditando] = useState<PresentacionDTO | null>(null);
   const tituloForm = editando ? "Editar Presentación" : "Agregar Presentación";
   const textoBoton = editando ? "Guardar" : "Agregar";
@@ -61,6 +57,7 @@ export default function PresentacionesPage() {
   // upload por fila
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetIdForUpload, setTargetIdForUpload] = useState<number | null>(null);
+  const [uploadingId, setUploadingId] = useState<number | null>(null); // <<< NUEVO
 
   // (opcional) upload desde el formulario de crear/editar
   const [newFile, setNewFile] = useState<File | null>(null);
@@ -108,35 +105,30 @@ export default function PresentacionesPage() {
     e.stopPropagation();
     setIsDragging(true);
   }
-
   function onDragLeave(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
   }
-
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
     const dt = e.dataTransfer;
     const file =
-      dt.items && dt.items.length
-        ? (dt.items[0].kind === "file" ? dt.items[0].getAsFile() : null)
-        : dt.files?.[0];
+        dt.items && dt.items.length
+            ? (dt.items[0].kind === "file" ? dt.items[0].getAsFile() : null)
+            : dt.files?.[0];
     if (file) validateAndSetFile(file);
   }
 
-
-
-
-  // ✅ cargar combos con servicios reales
+  // cargar combos
   useEffect(() => {
     (async () => {
       try {
         const [prods, unis] = await Promise.all([
           opcionesProductos(),          // -> Array<{id, nombre}>
-          unidadService.opciones(),     // -> Array<{id, nombre}> (símbolo o nombre corto)
+          unidadService.opciones(),     // -> Array<{id, nombre}>
         ]);
         setProductos(prods);
         setUnidades(unis);
@@ -147,7 +139,10 @@ export default function PresentacionesPage() {
     })();
   }, []);
 
-  const params = useMemo(() => ({ idProducto, q, page, size, sort, soloActivos }), [idProducto, q, page, size, sort, soloActivos]);
+  const params = useMemo(
+      () => ({ idProducto, q, page, size, sort, soloActivos }),
+      [idProducto, q, page, size, sort, soloActivos]
+  );
 
   // listar
   const load = async () => {
@@ -177,7 +172,6 @@ export default function PresentacionesPage() {
           margenVentaPorcentaje: form.margenVentaPorcentaje,
           precioVentaBob: form.precioVentaBob,
         });
-        // si hay imagen nueva, súbela
         if (newFile) {
           await presentacionService.subirImagen(saved.idPresentacion, newFile);
         }
@@ -187,8 +181,7 @@ export default function PresentacionesPage() {
           await presentacionService.subirImagen(saved.idPresentacion, newFile);
         }
       }
-      // reset
-      resetPanel()
+      resetPanel();
       await load();
     } catch (e: any) {
       alert(e?.message || "No se pudo guardar");
@@ -219,384 +212,383 @@ export default function PresentacionesPage() {
     if (p.estadoActivo) {
       const ok = confirm(`¿Desactivar la presentación ${p.codigoSku}?`);
       if (!ok) return;
-      await presentacionService.deactivate(p.idPresentacion); // ya lo tienes
+      await presentacionService.deactivate(p.idPresentacion);
     } else {
-      // Activar usando el endpoint de update (PresentacionActualizarDTO tiene estadoActivo)
       await presentacionService.update(p.idPresentacion, { estadoActivo: true });
     }
     await load();
   };
 
-
-  // helpers UI (muestran nombres en tabla)
+  // helpers UI
   const nombreProducto = (id: number) => productos.find(x => x.id === id)?.nombre || id;
   const simboloUnidad = (id: number) => unidades.find(x => x.id === id)?.nombre || id;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-4">Gestión de Presentaciones</h1>
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-4">Gestión de Presentaciones</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LISTA */}
-        <div className="lg:col-span-2">
-          {/* Filtros */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-3">
-            <select
-              className="border rounded-lg px-3 py-2 w-full sm:w-64"
-              value={idProducto ?? ""}
-              onChange={(e) => { setPage(0); setIdProducto(e.target.value ? Number(e.target.value) : undefined); }}
-            >
-              <option value="">Todos los productos</option>
-              {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* LISTA */}
+          <div className="lg:col-span-2">
+            {/* Filtros */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-3">
+              <select
+                  className="border rounded-lg px-3 py-2 w-full sm:w-64"
+                  value={idProducto ?? ""}
+                  onChange={(e) => { setPage(0); setIdProducto(e.target.value ? Number(e.target.value) : undefined); }}
+              >
+                <option value="">Todos los productos</option>
+                {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
 
-            <input
-              className="border rounded-lg px-3 py-2 w-full sm:flex-1"
-              placeholder="Buscar por SKU…"
-              value={q}
-              onChange={(e) => { setPage(0); setQ(e.target.value); }}
-            />
-
-            <select
-              className="border rounded-lg px-3 py-2 w-full sm:w-56"
-              value={sort}
-              onChange={(e) => { setPage(0); setSort(e.target.value); }}
-            >
-              <option value="codigoSku,asc">SKU (A→Z)</option>
-              <option value="codigoSku,desc">SKU (Z→A)</option>
-              <option value="idPresentacion,desc">Más recientes</option>
-              <option value="idPresentacion,asc">Más antiguas</option>
-            </select>
-
-            <label className="flex items-center gap-2 text-sm text-neutral-700">
               <input
-                type="checkbox"
-                className="accent-emerald-600"
-                checked={soloActivos}
-                onChange={(e) => { setSoloActivos(e.target.checked); setPage(0); }}
+                  className="border rounded-lg px-3 py-2 w-full sm:flex-1"
+                  placeholder="Buscar por SKU…"
+                  value={q}
+                  onChange={(e) => { setPage(0); setQ(e.target.value); }}
               />
-              Solo activos
-            </label>
 
-          </div>
+              <select
+                  className="border rounded-lg px-3 py-2 w-full sm:w-56"
+                  value={sort}
+                  onChange={(e) => { setPage(0); setSort(e.target.value); }}
+              >
+                <option value="codigoSku,asc">SKU (A→Z)</option>
+                <option value="codigoSku,desc">SKU (Z→A)</option>
+                <option value="idPresentacion,desc">Más recientes</option>
+                <option value="idPresentacion,asc">Más antiguas</option>
+              </select>
 
-          {err && <div className="text-red-600 mb-2">Error: {err}</div>}
-          {loading ? (
-            <div className="mb-2">Cargando…</div>
-          ) : (
-            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm text-neutral-700">
+                <input
+                    type="checkbox"
+                    className="accent-emerald-600"
+                    checked={soloActivos}
+                    onChange={(e) => { setSoloActivos(e.target.checked); setPage(0); }}
+                />
+                Solo activos
+              </label>
+            </div>
 
-              {/* Encabezado: visible solo en md+ */}
-              <div className="hidden md:grid w-full grid-cols-[64px_120px_1.2fr_0.8fr_0.8fr_0.8fr_132px] items-center text-xs uppercase text-neutral-500 px-3">
-                <div>Img</div>
-                <div>SKU</div>
-                <div>Producto</div>
-                <div>Unidad</div>
-                <div>Contenido</div>
-                <div>Precio BOB</div>
-                <div className="text-right pr-1">Acciones</div>
-              </div>
-
-
-              {/* Filas como cards */}
-              {data?.content?.length ? (
-                data.content.map((p) => (
-                  <div
-                    key={p.idPresentacion}
-                    className={
-                      // Móvil: 2 columnas (img + contenido); Desktop: las 7 columnas “tabla”
-                      "grid w-full grid-cols-[64px_1fr] md:grid-cols-[64px_120px_1.2fr_0.8fr_0.8fr_0.8fr_132px] " +
-                      "items-center gap-2 bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition " +
-                      (!p.estadoActivo ? "opacity-60" : "")
-                    }
-                  >
-                    {/* Img */}
-                    <div className="w-12 h-12">
-                      {p.imagenUrl ? (
-                        <img
-                          src={assetUrl(p.imagenUrl)}
-                          alt={p.codigoSku}
-                          className="w-12 h-12 object-cover rounded-md border"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-md border border-dashed border-neutral-300 flex items-center justify-center text-[10px] text-neutral-400">
-                          Sin img
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Contenido principal (columna 2 en móvil / varias en md+) */}
-                    {/* SKU (solo md+) */}
-                    <div className="hidden md:block font-semibold text-neutral-800">{p.codigoSku}</div>
-
-                    {/* Producto */}
-                    <div className="min-w-0">
-                      <div className="font-semibold text-neutral-800 truncate">
-                        {nombreProducto(p.idProducto)}
-                      </div>
-
-                      {/* Subtítulo compacto SOLO en móvil */}
-                      <div className="mt-1 text-[13px] text-neutral-600 md:hidden">
-                        <span className="font-medium text-neutral-700">SKU:</span> {p.codigoSku}
-                        <span className="mx-1">·</span>
-                        <span className="font-medium text-neutral-700">Unid:</span> {simboloUnidad(p.idUnidad)}
-                        <span className="mx-1">·</span>
-                        <span className="font-medium text-neutral-700">Cont:</span> {p.contenidoPorUnidad}
-                        <span className="mx-1">·</span>
-                        <span className="font-medium text-neutral-700">Bs:</span> {p.precioVentaBob}
-                      </div>
-                    </div>
-
-                    {/* Unidad / Contenido / Precio (solo md+) */}
-                    <div className="hidden md:block">{simboloUnidad(p.idUnidad)}</div>
-                    <div className="hidden md:block">{p.contenidoPorUnidad}</div>
-                    <div className="hidden md:block">{p.precioVentaBob}</div>
-
-                    {/* Acciones */}
-                    <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-1 mt-2 md:mt-0">
-                      <button
-                        aria-label="Editar"
-                        title="Editar"
-                        onClick={() => onEdit(p)}
-                        className="p-2 rounded-md hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
-                      >
-                        <Pencil size={18} />
-                      </button>
-
-                      {p.estadoActivo ? (
-                        <button
-                          aria-label="Desactivar"
-                          title="Desactivar"
-                          onClick={() => onToggleEstado(p)}
-                          className="p-2 rounded-md hover:bg-neutral-100 text-rose-600 hover:text-rose-700"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      ) : (
-                        <button
-                          aria-label="Activar"
-                          title="Activar"
-                          onClick={() => onToggleEstado(p)}
-                          className="p-2 rounded-md hover:bg-neutral-100 text-emerald-600 hover:text-emerald-700"
-                        >
-                          <CheckCircle2 size={18} />
-                        </button>
-                      )}
-
-                      <button
-                        aria-label="Cambiar imagen"
-                        title="Cambiar imagen"
-                        onClick={() => {
-                          setTargetIdForUpload(p.idPresentacion);
-                          fileInputRef.current?.click();
-                        }}
-                        className="p-2 rounded-md hover:bg-neutral-100 text-emerald-700 hover:text-emerald-800"
-                      >
-                        <ImageUp size={18} />
-                      </button>
-                    </div>
+            {err && <div className="text-red-600 mb-2">Error: {err}</div>}
+            {loading ? (
+                <div className="mb-2">Cargando…</div>
+            ) : (
+                <div className="space-y-3">
+                  {/* Encabezado md+ */}
+                  <div className="hidden md:grid w-full grid-cols-[64px_120px_1.2fr_0.8fr_0.8fr_0.8fr_132px] items-center text-xs uppercase text-neutral-500 px-3">
+                    <div>Img</div>
+                    <div>SKU</div>
+                    <div>Producto</div>
+                    <div>Unidad</div>
+                    <div>Contenido</div>
+                    <div>Precio BOB</div>
+                    <div className="text-right pr-1">Acciones</div>
                   </div>
 
-                ))
-              ) : (
-                <div className="text-center text-neutral-500 py-10 bg-white rounded-xl">
-                  Sin registros
+                  {/* Filas */}
+                  {data?.content?.length ? (
+                      data.content.map((p) => (
+                          <div
+                              key={p.idPresentacion}
+                              className={
+                                  "grid w-full grid-cols-[64px_1fr] md:grid-cols-[64px_120px_1.2fr_0.8fr_0.8fr_0.8fr_132px] " +
+                                  "items-center gap-2 bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition " +
+                                  (!p.estadoActivo ? "opacity-60" : "")
+                              }
+                          >
+                            {/* Img */}
+                            <div className="w-12 h-12">
+                              {p.imagenUrl ? (
+                                  <img
+                                      src={assetUrl(p.imagenUrl)}
+                                      alt={p.codigoSku}
+                                      className="w-12 h-12 object-cover rounded-md border"
+                                      loading="lazy"
+                                  />
+                              ) : (
+                                  <div className="w-12 h-12 rounded-md border border-dashed border-neutral-300 flex items-center justify-center text-[10px] text-neutral-400">
+                                    Sin img
+                                  </div>
+                              )}
+                            </div>
+
+                            {/* SKU md+ */}
+                            <div className="hidden md:block font-semibold text-neutral-800">{p.codigoSku}</div>
+
+                            {/* Producto */}
+                            <div className="min-w-0">
+                              <div className="font-semibold text-neutral-800 truncate">
+                                {nombreProducto(p.idProducto)}
+                              </div>
+                              {/* Subtítulo móvil */}
+                              <div className="mt-1 text-[13px] text-neutral-600 md:hidden">
+                                <span className="font-medium text-neutral-700">SKU:</span> {p.codigoSku}
+                                <span className="mx-1">·</span>
+                                <span className="font-medium text-neutral-700">Unid:</span> {simboloUnidad(p.idUnidad)}
+                                <span className="mx-1">·</span>
+                                <span className="font-medium text-neutral-700">Cont:</span> {p.contenidoPorUnidad}
+                                <span className="mx-1">·</span>
+                                <span className="font-medium text-neutral-700">Bs:</span> {p.precioVentaBob}
+                              </div>
+                            </div>
+
+                            {/* Unidad / Contenido / Precio md+ */}
+                            <div className="hidden md:block">{simboloUnidad(p.idUnidad)}</div>
+                            <div className="hidden md:block">{p.contenidoPorUnidad}</div>
+                            <div className="hidden md:block">{p.precioVentaBob}</div>
+
+                            {/* Acciones */}
+                            <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-1 mt-2 md:mt-0">
+                              <button
+                                  aria-label="Editar"
+                                  title="Editar"
+                                  onClick={() => onEdit(p)}
+                                  className="p-2 rounded-md hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
+                              >
+                                <Pencil size={18} />
+                              </button>
+
+                              {p.estadoActivo ? (
+                                  <button
+                                      aria-label="Desactivar"
+                                      title="Desactivar"
+                                      onClick={() => onToggleEstado(p)}
+                                      className="p-2 rounded-md hover:bg-neutral-100 text-rose-600 hover:text-rose-700"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                              ) : (
+                                  <button
+                                      aria-label="Activar"
+                                      title="Activar"
+                                      onClick={() => onToggleEstado(p)}
+                                      className="p-2 rounded-md hover:bg-neutral-100 text-emerald-600 hover:text-emerald-700"
+                                  >
+                                    <CheckCircle2 size={18} />
+                                  </button>
+                              )}
+
+                              <button
+                                  aria-label="Cambiar imagen"
+                                  title="Cambiar imagen"
+                                  onClick={() => {
+                                    setTargetIdForUpload(p.idPresentacion);
+                                    fileInputRef.current?.click();
+                                  }}
+                                  disabled={uploadingId === p.idPresentacion} // <<< NUEVO
+                                  className="p-2 rounded-md hover:bg-neutral-100 text-emerald-700 hover:text-emerald-800 disabled:opacity-50 disabled:pointer-events-none"
+                              >
+                                <ImageUp size={18} />
+                              </button>
+                            </div>
+                          </div>
+                      ))
+                  ) : (
+                      <div className="text-center text-neutral-500 py-10 bg-white rounded-xl">
+                        Sin registros
+                      </div>
+                  )}
+
+                  {/* input oculto para subir imagen (compartido por filas) */}
+                  <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        // CAPTURA el input ANTES de cualquier await
+                        const inputEl = e.currentTarget;
+                        const file = inputEl.files?.[0];
+                        const id = targetIdForUpload;
+
+                        if (!file || id == null) {
+                          inputEl.value = "";
+                          return;
+                        }
+
+                        if (!file.type.startsWith("image/")) {
+                          alert("Solo imágenes");
+                          inputEl.value = "";
+                          return;
+                        }
+                        if (file.size > 5 * 1024 * 1024) {
+                          alert("Máx. 5MB");
+                          inputEl.value = "";
+                          return;
+                        }
+
+                        try {
+                          setUploadingId(id);
+                          await presentacionService.subirImagen(id, file);
+                          await load();
+                        } catch (err: any) {
+                          alert(err?.message || "No se pudo subir la imagen");
+                        } finally {
+                          setUploadingId(null);
+                          setTargetIdForUpload(null);
+                          inputEl.value = ""; // limpia SIEMPRE (permite re-subir el mismo archivo)
+                        }
+                      }}
+                  />
                 </div>
-              )}
+            )}
 
-              {/* input oculto para subir imagen (compartido por filas) */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (!f || targetIdForUpload == null) return;
-
-                  if (!f.type.startsWith("image/")) {
-                    alert("Solo imágenes");
-                    e.currentTarget.value = "";
-                    return;
-                  }
-                  if (f.size > 5 * 1024 * 1024) {
-                    alert("Máx. 5MB");
-                    e.currentTarget.value = "";
-                    return;
-                  }
-
-                  await presentacionService.subirImagen(targetIdForUpload, f);
-                  setTargetIdForUpload(null);
-                  e.currentTarget.value = "";
-                  await load();
-                }}
-              />
+            {/* paginación */}
+            <div className="mt-4 md:mt-3 flex flex-wrap items-center gap-2">
+              <button className="border rounded px-3 py-1" disabled={!data || data.first} onClick={() => setPage(p => Math.max(0, p - 1))}>Anterior</button>
+              <span>Página {data ? data.number + 1 : page + 1} de {data ? data.totalPages : 1}</span>
+              <button className="border rounded px-3 py-1" disabled={!data || data.last} onClick={() => setPage(p => p + 1)}>Siguiente</button>
+              <select className="border rounded px-2 py-1 ml-auto" value={size} onChange={(e) => { setPage(0); setSize(Number(e.target.value)); }}>
+                {[10, 20, 50].map(n => <option key={n} value={n}>{n} por página</option>)}
+              </select>
             </div>
-          )}
-
-
-          {/* paginación */}
-          <div className="mt-4 md:mt-3 flex flex-wrap items-center gap-2">
-            <button className="border rounded px-3 py-1" disabled={!data || data.first} onClick={() => setPage(p => Math.max(0, p - 1))}>Anterior</button>
-            <span>Página {data ? data.number + 1 : page + 1} de {data ? data.totalPages : 1}</span>
-            <button className="border rounded px-3 py-1" disabled={!data || data.last} onClick={() => setPage(p => p + 1)}>Siguiente</button>
-            <select className="border rounded px-2 py-1 ml-auto" value={size} onChange={(e) => { setPage(0); setSize(Number(e.target.value)); }}>
-              {[10, 20, 50].map(n => <option key={n} value={n}>{n} por página</option>)}
-            </select>
           </div>
-        </div>
 
-        {/* FORM */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4">
-            <div className="bg-white border rounded-xl p-4">
-              <h2 className="text-lg font-semibold mb-2">{tituloForm}</h2>
-              <form className="space-y-3" onSubmit={onSubmit}>
-                <div>
-                  <label className="block text-sm text-neutral-700 mb-1">Producto</label>
-                  <select
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={form.idProducto}
-                    onChange={(e) => setForm(f => ({ ...f, idProducto: Number(e.target.value) }))}
-                  >
-                    <option value={0} disabled>Selecciona…</option>
-                    {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+          {/* FORM */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-4">
+              <div className="bg-white border rounded-xl p-4">
+                <h2 className="text-lg font-semibold mb-2">{tituloForm}</h2>
+                <form className="space-y-3" onSubmit={onSubmit}>
                   <div>
-                    <label className="block text-sm text-neutral-700 mb-1">Unidad</label>
+                    <label className="block text-sm text-neutral-700 mb-1">Producto</label>
                     <select
-                      className="w-full border rounded-lg px-3 py-2"
-                      value={form.idUnidad}
-                      onChange={(e) => setForm(f => ({ ...f, idUnidad: Number(e.target.value) }))}
+                        className="w-full border rounded-lg px-3 py-2"
+                        value={form.idProducto}
+                        onChange={(e) => setForm(f => ({ ...f, idProducto: Number(e.target.value) }))}
                     >
                       <option value={0} disabled>Selecciona…</option>
-                      {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                      {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm text-neutral-700 mb-1">Contenido</label>
-                    <input
-                      type="number" min={0} step="0.000001"
-                      className="w-full border rounded-lg px-3 py-2"
-                      value={form.contenidoPorUnidad}
-                      onChange={(e) => setForm(f => ({ ...f, contenidoPorUnidad: Number(e.target.value) }))}
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm text-neutral-700 mb-1">SKU</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={form.codigoSku}
-                    onChange={(e) => setForm(f => ({ ...f, codigoSku: e.target.value }))}
-                    placeholder="p. ej., GLI-1L"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm text-neutral-700 mb-1">Costo USD</label>
-                    <input
-                      type="number" step="0.01" min={0}
-                      className="w-full border rounded-lg px-3 py-2"
-                      value={form.costoBaseUsd ?? 0}
-                      onChange={(e) => setForm(f => ({ ...f, costoBaseUsd: Number(e.target.value) }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-neutral-700 mb-1">% Margen</label>
-                    <input
-                      type="number" step="0.01" min={0}
-                      className="w-full border rounded-lg px-3 py-2"
-                      value={form.margenVentaPorcentaje ?? 0}
-                      onChange={(e) => setForm(f => ({ ...f, margenVentaPorcentaje: Number(e.target.value) }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-neutral-700 mb-1">Precio BOB</label>
-                    <input
-                      type="number" step="0.01" min={0}
-                      className="w-full border rounded-lg px-3 py-2"
-                      value={form.precioVentaBob ?? 0}
-                      onChange={(e) => setForm(f => ({ ...f, precioVentaBob: Number(e.target.value) }))}
-                    />
-                  </div>
-                </div>
-                {/* Imagen de la presentación (opcional) */}
-                {/* Imagen de la presentación (dropzone) */}
-                <div>
-                  <label className="block text-sm text-neutral-700 mb-1">Imagen</label>
-
-                  {/* Dropzone */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={pickFormFile}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pickFormFile(); }}
-                    onDragOver={onDragOver}
-                    onDragEnter={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    className={[
-                      "rounded-lg border-2 border-dashed p-4 flex items-center gap-4 cursor-pointer transition",
-                      isDragging ? "border-emerald-500 bg-emerald-50/40" : "border-neutral-300 hover:bg-neutral-50"
-                    ].join(" ")}
-                  >
-                    {/* Preview si hay archivo elegido */}
-                    {preview ? (
-                      <img
-                        src={preview}
-                        alt="preview"
-                        className="w-16 h-16 object-cover rounded-md border"
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm text-neutral-700 mb-1">Unidad</label>
+                      <select
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={form.idUnidad}
+                          onChange={(e) => setForm(f => ({ ...f, idUnidad: Number(e.target.value) }))}
+                      >
+                        <option value={0} disabled>Selecciona…</option>
+                        {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-neutral-700 mb-1">Contenido</label>
+                      <input
+                          type="number" min={0} step="0.000001"
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={form.contenidoPorUnidad}
+                          onChange={(e) => setForm(f => ({ ...f, contenidoPorUnidad: Number(e.target.value) }))}
                       />
-                    ) : (
-                      <div className="w-16 h-16 rounded-md border border-dashed border-neutral-300 flex items-center justify-center text-[10px] text-neutral-400">
-                        Sin img
-                      </div>
-                    )}
-
-                    <div className="text-sm text-neutral-700">
-                      <div className="font-medium">Arrastra una imagen aquí o haz clic</div>
-                      <div className="text-xs text-neutral-500">Formatos: JPG/PNG. Máx: 5MB</div>
                     </div>
                   </div>
 
-                  {/* input real oculto (formulario) */}
-                  <input
-                    ref={formFileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={onFormFileChange}
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm text-neutral-700 mb-1">SKU</label>
+                    <input
+                        className="w-full border rounded-lg px-3 py-2"
+                        value={form.codigoSku}
+                        onChange={(e) => setForm(f => ({ ...f, codigoSku: e.target.value }))}
+                        placeholder="p. ej., GLI-1L"
+                    />
+                  </div>
 
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm text-neutral-700 mb-1">Costo USD</label>
+                      <input
+                          type="number" step="0.01" min={0}
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={form.costoBaseUsd ?? 0}
+                          onChange={(e) => setForm(f => ({ ...f, costoBaseUsd: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-neutral-700 mb-1">% Margen</label>
+                      <input
+                          type="number" step="0.01" min={0}
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={form.margenVentaPorcentaje ?? 0}
+                          onChange={(e) => setForm(f => ({ ...f, margenVentaPorcentaje: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-neutral-700 mb-1">Precio BOB</label>
+                      <input
+                          type="number" step="0.01" min={0}
+                          className="w-full border rounded-lg px-3 py-2"
+                          value={form.precioVentaBob ?? 0}
+                          onChange={(e) => setForm(f => ({ ...f, precioVentaBob: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
 
-                <div className="pt-2 flex gap-2">
-                  <button type="submit" className="flex-1 h-10 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
-                    {textoBoton}
-                  </button>
-                  {editando && (
-                    <button
-                      type="button"
-                      className="h-10 px-4 rounded-lg border hover:bg-neutral-50"
-                      onClick={resetPanel}
+                  {/* Imagen (dropzone) */}
+                  <div>
+                    <label className="block text-sm text-neutral-700 mb-1">Imagen</label>
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={pickFormFile}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pickFormFile(); }}
+                        onDragOver={onDragOver}
+                        onDragEnter={onDragOver}
+                        onDragLeave={onDragLeave}
+                        onDrop={onDrop}
+                        className={[
+                          "rounded-lg border-2 border-dashed p-4 flex items-center gap-4 cursor-pointer transition",
+                          isDragging ? "border-emerald-500 bg-emerald-50/40" : "border-neutral-300 hover:bg-neutral-50"
+                        ].join(" ")}
                     >
-                      Cancelar
-                    </button>
+                      {preview ? (
+                          <img
+                              src={preview}
+                              alt="preview"
+                              className="w-16 h-16 object-cover rounded-md border"
+                          />
+                      ) : (
+                          <div className="w-16 h-16 rounded-md border border-dashed border-neutral-300 flex items-center justify-center text-[10px] text-neutral-400">
+                            Sin img
+                          </div>
+                      )}
 
-                  )}
-                </div>
-              </form>
+                      <div className="text-sm text-neutral-700">
+                        <div className="font-medium">Arrastra una imagen aquí o haz clic</div>
+                        <div className="text-xs text-neutral-500">Formatos: JPG/PNG. Máx: 5MB</div>
+                      </div>
+                    </div>
+
+                    <input
+                        ref={formFileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={onFormFileChange}
+                    />
+                  </div>
+
+                  <div className="pt-2 flex gap-2">
+                    <button type="submit" className="flex-1 h-10 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                      {textoBoton}
+                    </button>
+                    {editando && (
+                        <button
+                            type="button"
+                            className="h-10 px-4 rounded-lg border hover:bg-neutral-50"
+                            onClick={resetPanel}
+                        >
+                          Cancelar
+                        </button>
+                    )}
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }

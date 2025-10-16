@@ -5,16 +5,16 @@ import com.soyanga.soyangabackend.dominio.PresentacionProducto;
 import com.soyanga.soyangabackend.dto.catalogo.*;
 import com.soyanga.soyangabackend.repositorio.catalogo.CodigoBarrasRepositorio;
 import com.soyanga.soyangabackend.repositorio.catalogo.PresentacionProductoRepositorio;
+import com.soyanga.soyangabackend.servicio.archivos.StorageService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-
-import com.soyanga.soyangabackend.servicio.archivos.StorageService;
-import org.springframework.web.multipart.MultipartFile;
-import jakarta.persistence.EntityNotFoundException;
 
 @Service
 @RequiredArgsConstructor
@@ -22,8 +22,6 @@ public class PresentacionServicio {
 
     private final PresentacionProductoRepositorio presentacionRepo;
     private final CodigoBarrasRepositorio codigoRepo;
-
-    // NUEVO
     private final StorageService storage;
 
     public Page<PresentacionDTO> buscar(Long idProducto, String q, Boolean estadoActivo, Pageable pageable) {
@@ -40,7 +38,6 @@ public class PresentacionServicio {
 
     @Transactional
     public PresentacionDTO crear(PresentacionCrearDTO dto) {
-        // Validaciones mínimas (Bean Validation ya ayuda; reforzamos por claridad)
         if (dto.getCodigoSku() == null || dto.getCodigoSku().isBlank())
             throw new IllegalArgumentException("codigoSku es requerido");
 
@@ -55,8 +52,7 @@ public class PresentacionServicio {
                 .contenidoPorUnidad(dto.getContenidoPorUnidad())
                 .codigoSku(dto.getCodigoSku().trim())
                 .costoBaseUsd(dto.getCostoBaseUsd() != null ? dto.getCostoBaseUsd() : java.math.BigDecimal.ZERO)
-                .margenVentaPorcentaje(dto.getMargenVentaPorcentaje() != null ? dto.getMargenVentaPorcentaje()
-                        : java.math.BigDecimal.ZERO)
+                .margenVentaPorcentaje(dto.getMargenVentaPorcentaje() != null ? dto.getMargenVentaPorcentaje() : java.math.BigDecimal.ZERO)
                 .precioVentaBob(dto.getPrecioVentaBob() != null ? dto.getPrecioVentaBob() : java.math.BigDecimal.ZERO)
                 .estadoActivo(true)
                 .build();
@@ -70,10 +66,8 @@ public class PresentacionServicio {
         var p = presentacionRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Presentación no encontrada: " + id));
 
-        if (dto.getIdUnidad() != null)
-            p.setIdUnidad(dto.getIdUnidad());
-        if (dto.getContenidoPorUnidad() != null)
-            p.setContenidoPorUnidad(dto.getContenidoPorUnidad());
+        if (dto.getIdUnidad() != null)             p.setIdUnidad(dto.getIdUnidad());
+        if (dto.getContenidoPorUnidad() != null)   p.setContenidoPorUnidad(dto.getContenidoPorUnidad());
 
         if (dto.getCodigoSku() != null) {
             var sku = dto.getCodigoSku().trim();
@@ -85,14 +79,10 @@ public class PresentacionServicio {
             p.setCodigoSku(sku);
         }
 
-        if (dto.getCostoBaseUsd() != null)
-            p.setCostoBaseUsd(dto.getCostoBaseUsd());
-        if (dto.getMargenVentaPorcentaje() != null)
-            p.setMargenVentaPorcentaje(dto.getMargenVentaPorcentaje());
-        if (dto.getPrecioVentaBob() != null)
-            p.setPrecioVentaBob(dto.getPrecioVentaBob());
-        if (dto.getEstadoActivo() != null)
-            p.setEstadoActivo(dto.getEstadoActivo());
+        if (dto.getCostoBaseUsd() != null)         p.setCostoBaseUsd(dto.getCostoBaseUsd());
+        if (dto.getMargenVentaPorcentaje() != null)p.setMargenVentaPorcentaje(dto.getMargenVentaPorcentaje());
+        if (dto.getPrecioVentaBob() != null)       p.setPrecioVentaBob(dto.getPrecioVentaBob());
+        if (dto.getEstadoActivo() != null)         p.setEstadoActivo(dto.getEstadoActivo());
 
         p = presentacionRepo.save(p);
         return toDTO(p);
@@ -107,7 +97,6 @@ public class PresentacionServicio {
     }
 
     // --- Códigos de barras ---
-
     public List<CodigoBarrasDTO> listarCodigos(Long idPresentacion) {
         return codigoRepo.findByIdPresentacion(idPresentacion).stream()
                 .map(this::toCodigoDTO)
@@ -116,8 +105,6 @@ public class PresentacionServicio {
 
     @Transactional
     public CodigoBarrasDTO agregarCodigo(Long idPresentacion, CodigoBarrasCrearDTO dto) {
-        // podría validar duplicados: UNIQUE (id_presentacion, codigo_barras) ya lo hace
-        // la BD
         var cb = CodigoBarras.builder()
                 .idPresentacion(idPresentacion)
                 .codigoBarras(dto.getCodigoBarras().trim())
@@ -130,9 +117,48 @@ public class PresentacionServicio {
     @Transactional
     public void eliminarCodigo(Long idPresentacion, Long idCodigoBarras) {
         var list = codigoRepo.findByIdPresentacion(idPresentacion);
-        var match = list.stream().filter(x -> x.getIdCodigoBarras().equals(idCodigoBarras)).findFirst()
+        var match = list.stream()
+                .filter(x -> x.getIdCodigoBarras().equals(idCodigoBarras))
+                .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Código de barras no pertenece a la presentación"));
         codigoRepo.deleteById(match.getIdCodigoBarras());
+    }
+
+    // ====== IMAGEN PRESENTACIÓN ======
+    @Transactional
+    public PresentacionDTO subirImagen(Long idPresentacion, MultipartFile file) {
+        if (file == null || file.isEmpty())
+            throw new IllegalArgumentException("Archivo vacío");
+        String ctype = file.getContentType();
+        if (ctype == null || !ctype.toLowerCase().startsWith("image/"))
+            throw new IllegalArgumentException("Sólo se permiten imágenes");
+
+        var p = presentacionRepo.findById(idPresentacion)
+                .orElseThrow(() -> new EntityNotFoundException("Presentación no encontrada: " + idPresentacion));
+
+        try {
+            String url = storage.savePresentacionImage(idPresentacion, file);
+            p.setImagenUrl(url);
+            p = presentacionRepo.save(p);
+            return toDTO(p);
+        } catch (DataIntegrityViolationException dive) {
+            // típico: columna muy corta para la URL
+            throw new IllegalArgumentException("La URL de la imagen es demasiado larga para la columna", dive);
+        } catch (Exception e) {
+            // envuelve para que el controlador lo traduzca a 500 con mensaje claro
+            throw new RuntimeException("No se pudo guardar la imagen", e);
+        }
+    }
+
+    @Transactional
+    public void eliminarImagen(Long idPresentacion) {
+        var p = presentacionRepo.findById(idPresentacion)
+                .orElseThrow(() -> new EntityNotFoundException("Presentación no encontrada: " + idPresentacion));
+        try {
+            storage.deletePresentacionImage(idPresentacion);
+        } catch (Exception ignored) {}
+        p.setImagenUrl(null);
+        presentacionRepo.save(p);
     }
 
     // --- Mapeos ---
@@ -158,38 +184,5 @@ public class PresentacionServicio {
                 .codigoBarras(cb.getCodigoBarras())
                 .descripcion(cb.getDescripcion())
                 .build();
-    }
-
-    // ====== NUEVOS MÉTODOS IMAGEN ======
-    @Transactional
-    public PresentacionDTO subirImagen(Long idPresentacion, MultipartFile file) {
-        if (file == null || file.isEmpty())
-            throw new IllegalArgumentException("Archivo vacío");
-        if (file.getContentType() == null || !file.getContentType().startsWith("image/"))
-            throw new IllegalArgumentException("Solo se permiten imágenes");
-
-        var p = presentacionRepo.findById(idPresentacion)
-                .orElseThrow(() -> new EntityNotFoundException("Presentación no encontrada: " + idPresentacion));
-
-        try {
-            String url = storage.savePresentacionImage(idPresentacion, file);
-            p.setImagenUrl(url);
-            p = presentacionRepo.save(p);
-            return toDTO(p);
-        } catch (Exception e) {
-            throw new RuntimeException("No se pudo guardar la imagen", e);
-        }
-    }
-
-    @Transactional
-    public void eliminarImagen(Long idPresentacion) {
-        var p = presentacionRepo.findById(idPresentacion)
-                .orElseThrow(() -> new EntityNotFoundException("Presentación no encontrada: " + idPresentacion));
-        try {
-            storage.deletePresentacionImage(idPresentacion);
-        } catch (Exception ignored) {
-        }
-        p.setImagenUrl(null);
-        presentacionRepo.save(p);
     }
 }
