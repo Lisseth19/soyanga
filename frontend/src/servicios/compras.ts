@@ -1,106 +1,82 @@
-// 2) SERVICIO — src/servicios/compras.ts
+// src/servicios/compras.ts
+import { http } from "@/servicios/httpClient";
+import type {
+  Compra, CompraCrearDTO, CompraDetalleCrearDTO, CompraEstado, Page
+} from "@/types/compras";
 
-import type { Compra, CompraCrearDTO, CompraDetalleCrearDTO, CompraEstado, Page } from "@/types/compras";
-
-//-------------------------------------------------
-const API = '/api/v1/compras';
+const BASE = "/v1/compras";
 
 export type ListComprasParams = {
-  estado?: CompraEstado | '';
+  estado?: CompraEstado | "";
   proveedorId?: number;
-  desde?: string; // ISO datetime
-  hasta?: string; // ISO datetime
+  desde?: string; // YYYY-MM-DD o ISO
+  hasta?: string; // YYYY-MM-DD o ISO
   page?: number;
   size?: number;
 };
 
 function toIsoDateTime(d?: string, isEnd = false) {
   if (!d) return undefined;
-  // si ya viene con "T", la dejamos tal cual
-  if (d.includes('T')) return d;
+  if (d.includes("T")) return d;
   return isEnd ? `${d}T23:59:59` : `${d}T00:00:00`;
 }
 
+function clean<T extends Record<string, unknown>>(obj: T): T {
+  const out: Record<string, unknown> = {};
+  Object.entries(obj).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    out[k] = v;
+  });
+  return out as T;
+}
+
 export const comprasService = {
-  async listar(params: ListComprasParams): Promise<Page<any>> {
-    // normaliza fechas a LocalDateTime ISO
-    const final: Record<string, unknown> = {
+  listar(params: ListComprasParams): Promise<Page<any>> {
+    const q = clean({
       ...params,
       desde: toIsoDateTime(params.desde, false),
       hasta: toIsoDateTime(params.hasta, true),
-    };
+    });
+    return http.get<Page<any>>(BASE, { params: q });
+  },
 
-    const url = new URL(API, window.location.origin);
-    Object.entries(final).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
-    });
+  obtener(id: number): Promise<Compra> {
+    return http.get<Compra>(`${BASE}/${id}`);
+  },
 
-    const r = await fetch(url.toString());
-    if (!r.ok) throw new Error('No se pudo listar compras');
-    return r.json();
+  crear(dto: CompraCrearDTO): Promise<Compra> {
+    return http.post<Compra>(BASE, dto);
   },
-  async obtener(id: number): Promise<Compra> {
-    const r = await fetch(`${API}/${id}`);
-    if (!r.ok) throw new Error('Compra no encontrada');
-    return r.json();
+
+  agregarItem(idCompra: number, dto: CompraDetalleCrearDTO) {
+    return http.post(`${BASE}/${idCompra}/items`, dto);
   },
-  async crear(dto: CompraCrearDTO): Promise<Compra> {
-    const r = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dto),
-    });
-    if (!r.ok) throw new Error('No se pudo crear la compra');
-    return r.json();
-  },
-  async agregarItem(id: number, dto: CompraDetalleCrearDTO) {
-    const r = await fetch(`${API}/${id}/items`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dto),
-    });
-    if (!r.ok) throw new Error('No se pudo agregar el ítem');
-    return r.json();
-  },
-  // ✅ PUT con fetch y JSON body
-  async actualizarItem(
-    idCompra: number,
-    idDetalle: number,
-    dto: { cantidad?: number; costoUnitarioMoneda?: number; fechaEstimadaRecepcion?: string | null }
+
+  actualizarItem(
+      idCompra: number,
+      idDetalle: number,
+      dto: { cantidad?: number; costoUnitarioMoneda?: number; fechaEstimadaRecepcion?: string | null }
   ) {
-    const r = await fetch(`${API}/${idCompra}/items/${idDetalle}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dto),
+    return http.put(`${BASE}/${idCompra}/items/${idDetalle}`, dto);
+  },
+
+  eliminarItem(idCompra: number, idDetalle: number) {
+    return http.del(`${BASE}/${idCompra}/items/${idDetalle}`);
+  },
+
+  cambiarEstado(id: number, nuevo: CompraEstado) {
+    // si tu back espera query param ?nuevo=
+    return http.post(`${BASE}/${id}/estado`, undefined, { params: { nuevo } });
+    // si en tu back es body: return http.post(`${BASE}/${id}/estado`, { nuevo });
+  },
+
+  aprobar(id: number) {
+    return http.post(`${BASE}/${id}/aprobar`);
+  },
+
+  anular(id: number, motivo?: string) {
+    return http.post(`${BASE}/${id}/anular`, undefined, {
+      params: motivo ? { motivo } : {},
     });
-    if (!r.ok) throw new Error('No se pudo actualizar el ítem');
-    return r.json(); // devuelve el detalle actualizado (o lo que retorne tu API)
   },
-
-  // ✅ DELETE con fetch
-  async eliminarItem(idCompra: number, idDetalle: number) {
-    const r = await fetch(`${API}/${idCompra}/items/${idDetalle}`, { method: 'DELETE' });
-    if (!r.ok) throw new Error('No se pudo eliminar el ítem');
-    // tu endpoint probablemente devuelve 204; no hay JSON que leer
-    return;
-  },
-
-  async cambiarEstado(id: number, nuevo: CompraEstado) {
-    const r = await fetch(`${API}/${id}/estado?nuevo=${encodeURIComponent(nuevo)}`, { method: 'POST' });
-    if (!r.ok) throw new Error('No se pudo cambiar el estado');
-    return r.json();
-  },
-  async aprobar(id: number) {
-    const r = await fetch(`${API}/${id}/aprobar`, { method: 'POST' });
-    if (!r.ok) throw new Error('No se pudo aprobar la compra');
-    return r.json();
-  },
-  async anular(id: number, motivo?: string) {
-    const url = new URL(`${API}/${id}/anular`, window.location.origin);
-    if (motivo) url.searchParams.set('motivo', motivo);
-    const r = await fetch(url.toString(), { method: 'POST' });
-    if (!r.ok) throw new Error('No se pudo anular la compra');
-    return r.json();
-  },
-
 };
