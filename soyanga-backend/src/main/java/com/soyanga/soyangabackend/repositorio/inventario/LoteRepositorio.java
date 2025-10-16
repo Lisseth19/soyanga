@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface LoteRepositorio extends BaseRepository<Lote, Long> {
     Optional<Lote> findByIdRecepcionDetalleAndNumeroLote(Long idRecepcionDetalle, String numeroLote);
+
+    Optional<Lote> findByIdRecepcionDetalle(Long idRecepcionDetalle);
 }
