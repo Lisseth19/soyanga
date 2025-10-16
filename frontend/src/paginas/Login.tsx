@@ -1,3 +1,4 @@
+// src/paginas/Login.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -38,9 +39,18 @@ function LockIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export default function LoginPage() {
-    const { login } = useAuth();
+    const { login, user } = useAuth() as { login: (u: string, p: string) => Promise<any>; user?: any };
     const nav = useNavigate();
     const loc = useLocation() as any;
+
+    // Evitar indexación por buscadores
+    useEffect(() => {
+        const meta = document.createElement("meta");
+        meta.name = "robots";
+        meta.content = "noindex,nofollow";
+        document.head.appendChild(meta);
+        return () => { document.head.removeChild(meta); };
+    }, []);
 
     // Recordarme (solo usuario)
     const storedRemember = localStorage.getItem("login.remember") === "1";
@@ -59,7 +69,7 @@ export default function LoginPage() {
     useEffect(() => {
         if (!err) return;
         setShowToast(true);
-        const t = setTimeout(() => setShowToast(false), 4000); // ~4s
+        const t = setTimeout(() => setShowToast(false), 4000);
         return () => clearTimeout(t);
     }, [err]);
 
@@ -72,6 +82,14 @@ export default function LoginPage() {
 
     const disabled = useMemo(() => loading || !u.trim() || !p.trim(), [loading, u, p]);
 
+    // Si ya hay sesión y alguien entra al login, mándalo a /inicio
+    useEffect(() => {
+        if (!user) return;
+        const rawFrom = (loc?.state as any)?.from?.pathname as string | undefined;
+        const back = rawFrom && !rawFrom.startsWith("/soyanga") ? rawFrom : "/inicio";
+        nav(back, { replace: true });
+    }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErr(null);
@@ -79,7 +97,11 @@ export default function LoginPage() {
         try {
             await login(u, p);
             if (remember) localStorage.setItem("login.username", u.trim());
-            const to = loc?.state?.from?.pathname || "/";
+
+            // Destino por defecto = /inicio (área operadores)
+            const rawFrom = (loc?.state as any)?.from?.pathname as string | undefined;
+            const to = rawFrom && !rawFrom.startsWith("/soyanga") ? rawFrom : "/inicio";
+
             nav(to, { replace: true });
         } catch (e: any) {
             const msg = typeof e?.message === "string" && e.message.trim()
@@ -200,7 +222,6 @@ export default function LoginPage() {
                                 type="button"
                                 onClick={() => setShow((s) => !s)}
                                 aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
-                                // 👇 sin borde/fondo: solo ícono
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition"
                             >
                                 {show ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}

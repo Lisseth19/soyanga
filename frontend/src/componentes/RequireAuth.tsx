@@ -25,7 +25,7 @@ export default function RequireAuth({ children }: { children?: React.ReactNode }
 
     if (!hasSession) {
         // Redirige al login y recuerda adónde quería ir
-        return <Navigate to="/login" replace state={{ from: loc }} />;
+        return <Navigate to="/soyanga/login" replace state={{ from: loc }} />;
     }
 
     // Si se usa como wrapper: <RequireAuth><AppLayout/></RequireAuth>

@@ -19,7 +19,7 @@ import org.springframework.web.cors.*;
 import java.util.List;
 
 @Configuration
-@EnableMethodSecurity // necesario para @RequiereVer/@RequiereCrear/@RequiereActualizar/@RequiereEliminar
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -48,10 +48,11 @@ public class SecurityConfig {
                                 "/swagger-ui/**"
                         ).permitAll()
 
-                        // ❌ Eliminado: GET público de catálogo
-                        // .requestMatchers(HttpMethod.GET, "/api/v1/catalogo/**").permitAll()
+                        //  Catálogo PÚBLICO (solo lectura)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/catalogo/publico/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
-                        // ---- Resto: requiere token; la autorización fina la hacen las anotaciones ----
+                        // ---- Todo lo demás requiere token ------------------------------
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -84,14 +85,31 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         var cfg = new CorsConfiguration();
-        cfg.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:4200"));
+        cfg.setAllowedOrigins(List.of(
+                "http://localhost:5173",  // Vite
+                "http://localhost:4200"   // (si lo usas)
+        ));
         cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         cfg.setAllowedHeaders(List.of("Authorization","Content-Type","Accept"));
         cfg.setAllowCredentials(true);
         cfg.setMaxAge(3600L);
 
         var source = new UrlBasedCorsConfigurationSource();
+        // Si quieres CORS más estricto SOLO para el público:
+        // source.registerCorsConfiguration("/api/v1/catalogo/publico/**", cfgPublicoSoloGET());
         source.registerCorsConfiguration("/**", cfg);
         return source;
+    }
+
+    // (Opcional) CORS solo GET para el público
+    @SuppressWarnings("unused")
+    private CorsConfiguration cfgPublicoSoloGET() {
+        var c = new CorsConfiguration();
+        c.setAllowedOrigins(List.of("http://localhost:5173"));
+        c.setAllowedMethods(List.of("GET","OPTIONS"));
+        c.setAllowedHeaders(List.of("Content-Type","Accept"));
+        c.setAllowCredentials(false);
+        c.setMaxAge(3600L);
+        return c;
     }
 }

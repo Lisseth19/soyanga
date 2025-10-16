@@ -1,11 +1,11 @@
 // src/api/httpClient.ts
 // Cliente HTTP con:
 // - BASE_URL desde Vite (VITE_API_BASE) → /api por defecto (proxy)
-// - Bearer automático (salvo login/refresh)
+// - Bearer automático (salvo login/refresh y público GET)
 // - Auto-refresh en 401 (una sola vez)
 // - Timeout + reintentos en GET transitorios
 // - Limpieza de params y JSON automático
-// - ⚡️ Watcher de expiración del JWT + eventos amigables (expiring / expired / refreshed)
+// - Watcher de expiración del JWT + eventos (expiring / expired / refreshed)
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type AuthEventName = "auth:expiring" | "auth:expired" | "auth:refreshed";
@@ -17,7 +17,7 @@ export function getAccessToken(): string | null { return localStorage.getItem("a
 export function getRefreshToken(): string | null { return localStorage.getItem("refreshToken"); }
 
 /* ===== Watcher de expiración ===== */
-const EXPIRY_LEAD_MS = 2 * 60 * 1000; // ⏰ avisa 2 minutos antes de expirar (ajústalo si quieres)
+const EXPIRY_LEAD_MS = 2 * 60 * 1000; // avisa 2 minutos antes de expirar
 let expiringTimer: number | null = null;
 let expiredTimer: number | null = null;
 
@@ -75,11 +75,11 @@ export function startTokenWatch(token?: string | null) {
   }, msToExp);
 }
 
-/* ===== Guardado/Limpieza de tokens (ahora con watcher) ===== */
+/* ===== Guardado/Limpieza de tokens (con watcher) ===== */
 export function saveTokens(tokens: { accessToken?: string; refreshToken?: string | null }) {
   if (tokens.accessToken) {
     localStorage.setItem("accessToken", tokens.accessToken);
-    startTokenWatch(tokens.accessToken); // ← reinicia watcher con el token nuevo
+    startTokenWatch(tokens.accessToken);
   }
   if (tokens.refreshToken != null) localStorage.setItem("refreshToken", tokens.refreshToken);
 }
@@ -164,6 +164,8 @@ function mergeSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined
 
 // Evitar auth en estos paths (aunque pase {auth:true})
 const NO_AUTH_REGEX = /\/v1\/auth\/(login|refresh)(\/)?$/;
+// GET público (catálogo)
+const PUBLIC_GET_REGEX = /^\/v1\/catalogo\/publico\/.*/;
 
 /* =============== Refresh control (una sola vez) =============== */
 let refreshPromise: Promise<boolean> | null = null;
@@ -180,11 +182,11 @@ async function doRefreshOnce(): Promise<boolean> {
       const res = await fetch(url, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify(rt), // backend espera string crudo entre comillas
+        body: JSON.stringify(rt),
       });
 
       if (!res.ok) {
-        clearTokens(); // refresh falló
+        clearTokens();
         return false;
       }
 
@@ -216,9 +218,13 @@ async function coreFetch<T, B = unknown>(path: string, options: HttpOptions<B> =
   const retry = { ...DEFAULT_RETRY, ...(options.retry ?? {}) };
   const credentials = options.credentials;
 
-  // auth: true por defecto, pero se anula para login/refresh
+  // auth: true por defecto
   const authWanted = options.auth ?? true;
-  const authEnabled = authWanted && !NO_AUTH_REGEX.test(path);
+
+  // Desactiva auth para login/refresh y para GET público de catálogo
+  const withoutAuthForLogin = NO_AUTH_REGEX.test(path);
+  const withoutAuthForPublicGet = method === "GET" && PUBLIC_GET_REGEX.test(path);
+  const authEnabled = authWanted && !withoutAuthForLogin && !withoutAuthForPublicGet;
 
   const url = buildUrl(path, options.params);
 
@@ -226,7 +232,7 @@ async function coreFetch<T, B = unknown>(path: string, options: HttpOptions<B> =
   const timeoutId = setTimeout(() => timeoutCtrl.abort(), timeoutMs);
   const signal = mergeSignals(timeoutCtrl.signal, options.signal);
 
-  // guarda el body original para reusar en reintentos
+  // guardar body original para reintentos
   const payload = options.body;
 
   const attempt = async (): Promise<T> => {
@@ -307,13 +313,13 @@ async function coreFetch<T, B = unknown>(path: string, options: HttpOptions<B> =
       const apiErr = e as ApiError;
       lastError = apiErr;
 
-      // 401 ⇒ intenta refresh sólo una vez (si authEnabled y no es /auth/login|refresh)
+      // 401 ⇒ intenta refresh una sola vez (si authEnabled y no es /auth/login|refresh)
       if (authEnabled && apiErr.status === 401 && !triedRefresh) {
         triedRefresh = true;
         const ok = await doRefreshOnce();
-        if (ok) { i--; continue; }       // repite con token fresco
-        clearTokens();                   // refresh falló ⇒ limpia
-        notifyAuthEvent("auth:expired"); // 🔔 avisa a la UI
+        if (ok) { i--; continue; }
+        clearTokens();
+        notifyAuthEvent("auth:expired");
         break;
       }
 
@@ -345,4 +351,18 @@ export const http = {
 
   del:  <T>(path: string, opts: Omit<HttpOptions, "method" | "body"> = {}) =>
       coreFetch<T>(path, { ...opts, method: "DELETE" }),
+};
+
+/* ===== Cliente público (forzado sin auth) ===== */
+export const httpPublic = {
+  get:   <T>(path: string, opts: Omit<HttpOptions, "method" | "body"> = {}) =>
+      coreFetch<T>(path, { ...opts, method: "GET",   auth: false }),
+  post:  <T, B = unknown>(path: string, body?: B, opts: Omit<HttpOptions<B>, "method"> = {}) =>
+      coreFetch<T, B>(path, { ...opts, method: "POST", auth: false, body }),
+  put:   <T, B = unknown>(path: string, body?: B, opts: Omit<HttpOptions<B>, "method"> = {}) =>
+      coreFetch<T, B>(path, { ...opts, method: "PUT",  auth: false, body }),
+  patch: <T, B = unknown>(path: string, body?: B, opts: Omit<HttpOptions<B>, "method"> = {}) =>
+      coreFetch<T, B>(path, { ...opts, method: "PATCH",auth: false, body }),
+  del:   <T>(path: string, opts: Omit<HttpOptions, "method" | "body"> = {}) =>
+      coreFetch<T>(path, { ...opts, method: "DELETE", auth: false }),
 };

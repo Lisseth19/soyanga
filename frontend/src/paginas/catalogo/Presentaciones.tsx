@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { presentacionService } from "@/servicios/presentacion";
 import type { Page, PresentacionDTO, PresentacionCrearDTO } from "@/types/presentacion";
-import { Pencil, Trash2, ImageUp, CheckCircle2 } from "lucide-react"; // ← íconos
-// ✅ usa tus servicios reales de opciones
+import { Pencil, Trash2, ImageUp, CheckCircle2 } from "lucide-react";
 import { opcionesProductos } from "@/servicios/producto";
 import { unidadService } from "@/servicios/unidad";
 
@@ -15,7 +14,7 @@ export default function PresentacionesPage() {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(10);
   const [sort, setSort] = useState("codigoSku,asc");
-  const [soloActivos, setSoloActivos] = useState(true); // ← NUEVO, por defecto marcado
+  const [soloActivos, setSoloActivos] = useState(true);
 
   // datos
   const [data, setData] = useState<Page<PresentacionDTO> | null>(null);
@@ -26,17 +25,15 @@ export default function PresentacionesPage() {
   const [productos, setProductos] = useState<Opcion[]>([]);
   const [unidades, setUnidades] = useState<Opcion[]>([]);
 
-  const [prodFiltro, setProdFiltro] = useState(""); // texto de búsqueda en el panel derecho
+  // Buscador de producto en el panel derecho
+  const [prodFiltro, setProdFiltro] = useState("");
+  const productosFiltrados = useMemo(() => {
+    const s = prodFiltro.trim().toLowerCase();
+    if (!s) return productos;
+    return productos.filter((p) => p.nombre.toLowerCase().includes(s));
+  }, [prodFiltro, productos]);
 
-const productosFiltrados = useMemo(() => {
-  const q = prodFiltro.trim().toLowerCase();
-  if (!q) return productos;
-  return productos.filter(p => p.nombre.toLowerCase().includes(q));
-}, [prodFiltro, productos]);
-
-
-
-  // --- INICIO: helpers de panel crear/editar ---
+  // INICIO: helpers de panel crear/editar
   const INITIAL_FORM: PresentacionCrearDTO = {
     idProducto: 0,
     idUnidad: 0,
@@ -50,7 +47,6 @@ const productosFiltrados = useMemo(() => {
   // ref del input file del FORM (no confundir con fileInputRef de las filas)
   const formFileRef = useRef<HTMLInputElement>(null);
 
-  // función para resetear completamente el panel
   function resetPanel() {
     setEditando(null);
     setForm(INITIAL_FORM);
@@ -58,25 +54,24 @@ const productosFiltrados = useMemo(() => {
     setPreview(null);
     if (formFileRef.current) formFileRef.current.value = "";
   }
-  // --- FIN: helpers de panel crear/editar ---
-
+  // FIN: helpers de panel crear/editar
 
   // form
   const [form, setForm] = useState<PresentacionCrearDTO>(INITIAL_FORM);
-
   const [editando, setEditando] = useState<PresentacionDTO | null>(null);
   const tituloForm = editando ? "Editar Presentación" : "Agregar Presentación";
   const textoBoton = editando ? "Guardar" : "Agregar";
 
-  // upload por fila
+  // upload por fila (lista)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetIdForUpload, setTargetIdForUpload] = useState<number | null>(null);
+  const [uploadingId, setUploadingId] = useState<number | null>(null);
 
-  // (opcional) upload desde el formulario de crear/editar
+  // upload desde el formulario
   const [newFile, setNewFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  const ASSETS_BASE = import.meta.env.VITE_ASSETS_BASE ?? ""; // ej: http://localhost:8084
+  const ASSETS_BASE = import.meta.env.VITE_ASSETS_BASE ?? "";
   function assetUrl(path?: string | null) {
     if (!path) return "";
     if (/^https?:\/\//i.test(path)) return path;
@@ -86,7 +81,7 @@ const productosFiltrados = useMemo(() => {
   // Arrastrar/soltar (UI)
   const [isDragging, setIsDragging] = useState(false);
 
-  // Valida y setea archivo (tamaño y tipo)
+  // Valida y setea archivo (tamaño y tipo) para el formulario
   function validateAndSetFile(file: File) {
     if (!file.type.startsWith("image/")) {
       alert("Solo se permiten imágenes");
@@ -107,24 +102,22 @@ const productosFiltrados = useMemo(() => {
     validateAndSetFile(f);
   }
 
-  // Para abrir el diálogo de archivos desde el dropzone
+  // Abrir diálogo de archivos desde el dropzone
   function pickFormFile() {
     formFileRef.current?.click();
   }
 
-  // Drag & drop handlers
+  // Drag & drop (form)
   function onDragOver(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
   }
-
   function onDragLeave(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
   }
-
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -137,21 +130,13 @@ const productosFiltrados = useMemo(() => {
     if (file) validateAndSetFile(file);
   }
 
-// opcional: cuando el form ya tiene idProducto, mostramos el nombre en el buscador
-useEffect(() => {
-  if (!form.idProducto) return;
-  const m = productos.find(p => p.id === form.idProducto);
-  if (m) setProdFiltro(m.nombre);
-}, [form.idProducto, productos]);
-
-
-  // ✅ cargar combos con servicios reales
+  // Cargar combos
   useEffect(() => {
     (async () => {
       try {
         const [prods, unis] = await Promise.all([
-          opcionesProductos(),          // -> Array<{id, nombre}>
-          unidadService.opciones(),     // -> Array<{id, nombre}> (símbolo o nombre corto)
+          opcionesProductos(), // -> Array<{id, nombre}>
+          unidadService.opciones(), // -> Array<{id, nombre}>
         ]);
         setProductos(prods);
         setUnidades(unis);
@@ -162,11 +147,22 @@ useEffect(() => {
     })();
   }, []);
 
-  const params = useMemo(() => ({ idProducto, q, page, size, sort, soloActivos }), [idProducto, q, page, size, sort, soloActivos]);
+  // opcional: si el form ya tiene idProducto, prellenar el buscador
+  useEffect(() => {
+    if (!form.idProducto) return;
+    const m = productos.find((p) => p.id === form.idProducto);
+    if (m) setProdFiltro(m.nombre);
+  }, [form.idProducto, productos]);
+
+  const params = useMemo(
+    () => ({ idProducto, q, page, size, sort, soloActivos }),
+    [idProducto, q, page, size, sort, soloActivos]
+  );
 
   // listar
   const load = async () => {
-    setLoading(true); setErr(null);
+    setLoading(true);
+    setErr(null);
     try {
       const res = await presentacionService.list(params);
       setData(res);
@@ -176,7 +172,10 @@ useEffect(() => {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [params]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   // acciones
   const onSubmit = async (e: React.FormEvent) => {
@@ -192,7 +191,6 @@ useEffect(() => {
           margenVentaPorcentaje: form.margenVentaPorcentaje,
           precioVentaBob: form.precioVentaBob,
         });
-        // si hay imagen nueva, súbela
         if (newFile) {
           await presentacionService.subirImagen(saved.idPresentacion, newFile);
         }
@@ -202,8 +200,7 @@ useEffect(() => {
           await presentacionService.subirImagen(saved.idPresentacion, newFile);
         }
       }
-      // reset
-      resetPanel()
+      resetPanel();
       await load();
     } catch (e: any) {
       alert(e?.message || "No se pudo guardar");
@@ -234,18 +231,16 @@ useEffect(() => {
     if (p.estadoActivo) {
       const ok = confirm(`¿Desactivar la presentación ${p.codigoSku}?`);
       if (!ok) return;
-      await presentacionService.deactivate(p.idPresentacion); // ya lo tienes
+      await presentacionService.deactivate(p.idPresentacion);
     } else {
-      // Activar usando el endpoint de update (PresentacionActualizarDTO tiene estadoActivo)
       await presentacionService.update(p.idPresentacion, { estadoActivo: true });
     }
     await load();
   };
 
-
-  // helpers UI (muestran nombres en tabla)
-  const nombreProducto = (id: number) => productos.find(x => x.id === id)?.nombre || id;
-  const simboloUnidad = (id: number) => unidades.find(x => x.id === id)?.nombre || id;
+  // helpers UI
+  const nombreProducto = (id: number) => productos.find((x) => x.id === id)?.nombre || id;
+  const simboloUnidad = (id: number) => unidades.find((x) => x.id === id)?.nombre || id;
 
   return (
     <div className="p-6">
@@ -259,23 +254,36 @@ useEffect(() => {
             <select
               className="border rounded-lg px-3 py-2 w-full sm:w-64"
               value={idProducto ?? ""}
-              onChange={(e) => { setPage(0); setIdProducto(e.target.value ? Number(e.target.value) : undefined); }}
+              onChange={(e) => {
+                setPage(0);
+                setIdProducto(e.target.value ? Number(e.target.value) : undefined);
+              }}
             >
               <option value="">Todos los productos</option>
-              {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              {productos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
             </select>
 
             <input
               className="border rounded-lg px-3 py-2 w-full sm:flex-1"
-              placeholder="Buscar por Nombre o Sku"
+              placeholder="Buscar por SKU…"
               value={q}
-              onChange={(e) => { setPage(0); setQ(e.target.value); }}
+              onChange={(e) => {
+                setPage(0);
+                setQ(e.target.value);
+              }}
             />
 
             <select
               className="border rounded-lg px-3 py-2 w-full sm:w-56"
               value={sort}
-              onChange={(e) => { setPage(0); setSort(e.target.value); }}
+              onChange={(e) => {
+                setPage(0);
+                setSort(e.target.value);
+              }}
             >
               <option value="codigoSku,asc">SKU (A→Z)</option>
               <option value="codigoSku,desc">SKU (Z→A)</option>
@@ -288,11 +296,13 @@ useEffect(() => {
                 type="checkbox"
                 className="accent-emerald-600"
                 checked={soloActivos}
-                onChange={(e) => { setSoloActivos(e.target.checked); setPage(0); }}
+                onChange={(e) => {
+                  setSoloActivos(e.target.checked);
+                  setPage(0);
+                }}
               />
               Solo activos
             </label>
-
           </div>
 
           {err && <div className="text-red-600 mb-2">Error: {err}</div>}
@@ -300,8 +310,7 @@ useEffect(() => {
             <div className="mb-2">Cargando…</div>
           ) : (
             <div className="space-y-3">
-
-              {/* Encabezado: visible solo en md+ */}
+              {/* Encabezado md+ */}
               <div className="hidden md:grid w-full grid-cols-[64px_120px_1.2fr_0.8fr_0.8fr_0.8fr_132px] items-center text-xs uppercase text-neutral-500 px-3">
                 <div>Img</div>
                 <div>SKU</div>
@@ -312,14 +321,12 @@ useEffect(() => {
                 <div className="text-right pr-1">Acciones</div>
               </div>
 
-
-              {/* Filas como cards */}
+              {/* Filas */}
               {data?.content?.length ? (
                 data.content.map((p) => (
                   <div
                     key={p.idPresentacion}
                     className={
-                      // Móvil: 2 columnas (img + contenido); Desktop: las 7 columnas “tabla”
                       "grid w-full grid-cols-[64px_1fr] md:grid-cols-[64px_120px_1.2fr_0.8fr_0.8fr_0.8fr_132px] " +
                       "items-center gap-2 bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition " +
                       (!p.estadoActivo ? "opacity-60" : "")
@@ -341,17 +348,13 @@ useEffect(() => {
                       )}
                     </div>
 
-                    {/* Contenido principal (columna 2 en móvil / varias en md+) */}
-                    {/* SKU (solo md+) */}
+                    {/* SKU md+ */}
                     <div className="hidden md:block font-semibold text-neutral-800">{p.codigoSku}</div>
 
                     {/* Producto */}
                     <div className="min-w-0">
-                      <div className="font-semibold text-neutral-800 truncate">
-                        {nombreProducto(p.idProducto)}
-                      </div>
-
-                      {/* Subtítulo compacto SOLO en móvil */}
+                      <div className="font-semibold text-neutral-800 truncate">{nombreProducto(p.idProducto)}</div>
+                      {/* Subtítulo móvil */}
                       <div className="mt-1 text-[13px] text-neutral-600 md:hidden">
                         <span className="font-medium text-neutral-700">SKU:</span> {p.codigoSku}
                         <span className="mx-1">·</span>
@@ -363,7 +366,7 @@ useEffect(() => {
                       </div>
                     </div>
 
-                    {/* Unidad / Contenido / Precio (solo md+) */}
+                    {/* Unidad / Contenido / Precio md+ */}
                     <div className="hidden md:block">{simboloUnidad(p.idUnidad)}</div>
                     <div className="hidden md:block">{p.contenidoPorUnidad}</div>
                     <div className="hidden md:block">{p.precioVentaBob}</div>
@@ -406,18 +409,16 @@ useEffect(() => {
                           setTargetIdForUpload(p.idPresentacion);
                           fileInputRef.current?.click();
                         }}
-                        className="p-2 rounded-md hover:bg-neutral-100 text-emerald-700 hover:text-emerald-800"
+                        disabled={uploadingId === p.idPresentacion}
+                        className="p-2 rounded-md hover:bg-neutral-100 text-emerald-700 hover:text-emerald-800 disabled:opacity-50 disabled:pointer-events-none"
                       >
                         <ImageUp size={18} />
                       </button>
                     </div>
                   </div>
-
                 ))
               ) : (
-                <div className="text-center text-neutral-500 py-10 bg-white rounded-xl">
-                  Sin registros
-                </div>
+                <div className="text-center text-neutral-500 py-10 bg-white rounded-xl">Sin registros</div>
               )}
 
               {/* input oculto para subir imagen (compartido por filas) */}
@@ -427,37 +428,75 @@ useEffect(() => {
                 accept="image/*"
                 className="hidden"
                 onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (!f || targetIdForUpload == null) return;
+                  // Captura el input ANTES de cualquier await (para no perder la referencia)
+                  const inputEl = e.currentTarget;
+                  const file = inputEl.files?.[0];
+                  const id = targetIdForUpload;
 
-                  if (!f.type.startsWith("image/")) {
+                  if (!file || id == null) {
+                    inputEl.value = "";
+                    return;
+                  }
+
+                  if (!file.type.startsWith("image/")) {
                     alert("Solo imágenes");
-                    e.currentTarget.value = "";
+                    inputEl.value = "";
                     return;
                   }
-                  if (f.size > 5 * 1024 * 1024) {
+                  if (file.size > 5 * 1024 * 1024) {
                     alert("Máx. 5MB");
-                    e.currentTarget.value = "";
+                    inputEl.value = "";
                     return;
                   }
 
-                  await presentacionService.subirImagen(targetIdForUpload, f);
-                  setTargetIdForUpload(null);
-                  e.currentTarget.value = "";
-                  await load();
+                  try {
+                    setUploadingId(id);
+                    await presentacionService.subirImagen(id, file);
+                    await load();
+                  } catch (err: any) {
+                    alert(err?.message || "No se pudo subir la imagen");
+                  } finally {
+                    setUploadingId(null);
+                    setTargetIdForUpload(null);
+                    inputEl.value = ""; // limpia SIEMPRE (permite re-subir el mismo archivo)
+                  }
                 }}
               />
             </div>
           )}
 
-
           {/* paginación */}
           <div className="mt-4 md:mt-3 flex flex-wrap items-center gap-2">
-            <button className="border rounded px-3 py-1" disabled={!data || data.first} onClick={() => setPage(p => Math.max(0, p - 1))}>Anterior</button>
-            <span>Página {data ? data.number + 1 : page + 1} de {data ? data.totalPages : 1}</span>
-            <button className="border rounded px-3 py-1" disabled={!data || data.last} onClick={() => setPage(p => p + 1)}>Siguiente</button>
-            <select className="border rounded px-2 py-1 ml-auto" value={size} onChange={(e) => { setPage(0); setSize(Number(e.target.value)); }}>
-              {[10, 20, 50].map(n => <option key={n} value={n}>{n} por página</option>)}
+            <button
+              className="border rounded px-3 py-1"
+              disabled={!data || (data as any).first}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Anterior
+            </button>
+            <span>
+              Página {(data as any)?.number + 1 || page + 1} de {(data as any)?.totalPages || 1}
+            </span>
+            <button
+              className="border rounded px-3 py-1"
+              disabled={!data || (data as any).last}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Siguiente
+            </button>
+            <select
+              className="border rounded px-2 py-1 ml-auto"
+              value={size}
+              onChange={(e) => {
+                setPage(0);
+                setSize(Number(e.target.value));
+              }}
+            >
+              {[10, 20, 50].map((n) => (
+                <option key={n} value={n}>
+                  {n} por página
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -469,38 +508,38 @@ useEffect(() => {
               <h2 className="text-lg font-semibold mb-2">{tituloForm}</h2>
               <form className="space-y-3" onSubmit={onSubmit}>
                 <div>
-  <label className="block text-sm text-neutral-700 mb-1">Producto</label>
+                  <label className="block text-sm text-neutral-700 mb-1">Producto</label>
 
-  {/* 🔎 Buscador por nombre */}
-  <input
-    className="w-full border rounded-lg px-3 py-2 mb-2"
-    placeholder="Buscar producto por nombre…"
-    value={prodFiltro}
-    onChange={(e) => setProdFiltro(e.target.value)}
-  />
+                  {/* Buscador por nombre */}
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 mb-2"
+                    placeholder="Buscar producto por nombre…"
+                    value={prodFiltro}
+                    onChange={(e) => setProdFiltro(e.target.value)}
+                  />
 
-  {/* Selector filtrado */}
-  <select
-    className="w-full border rounded-lg px-3 py-2"
-    value={form.idProducto > 0 ? form.idProducto : 0}
-    onChange={(e) =>
-      setForm(f => ({ ...f, idProducto: Number(e.target.value) }))
-    }
-  >
-    <option value={0} disabled>Selecciona…</option>
-    {productosFiltrados.slice(0, 100).map(p => (
-      <option key={p.id} value={p.id}>{p.nombre}</option>
-    ))}
-  </select>
+                  {/* Selector filtrado */}
+                  <select
+                    className="w-full border rounded-lg px-3 py-2"
+                    value={form.idProducto > 0 ? form.idProducto : 0}
+                    onChange={(e) => setForm((f) => ({ ...f, idProducto: Number(e.target.value) }))}
+                  >
+                    <option value={0} disabled>
+                      Selecciona…
+                    </option>
+                    {productosFiltrados.slice(0, 100).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
 
-  {/* Hint cuando no hay resultados */}
-  {prodFiltro && productosFiltrados.length === 0 && (
-    <div className="text-xs text-amber-600 mt-1">
-      No se encontraron productos con “{prodFiltro}”.
-    </div>
-  )}
-</div>
-
+                  {prodFiltro && productosFiltrados.length === 0 && (
+                    <div className="text-xs text-amber-600 mt-1">
+                      No se encontraron productos con “{prodFiltro}”.
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -508,19 +547,29 @@ useEffect(() => {
                     <select
                       className="w-full border rounded-lg px-3 py-2"
                       value={form.idUnidad}
-                      onChange={(e) => setForm(f => ({ ...f, idUnidad: Number(e.target.value) }))}
+                      onChange={(e) => setForm((f) => ({ ...f, idUnidad: Number(e.target.value) }))}
                     >
-                      <option value={0} disabled>Selecciona…</option>
-                      {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                      <option value={0} disabled>
+                        Selecciona…
+                      </option>
+                      {unidades.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.nombre}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm text-neutral-700 mb-1">Contenido</label>
                     <input
-                      type="number" min={0} step="0.000001"
+                      type="number"
+                      min={0}
+                      step="0.000001"
                       className="w-full border rounded-lg px-3 py-2"
                       value={form.contenidoPorUnidad}
-                      onChange={(e) => setForm(f => ({ ...f, contenidoPorUnidad: Number(e.target.value) }))}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, contenidoPorUnidad: Number(e.target.value) }))
+                      }
                     />
                   </div>
                 </div>
@@ -530,7 +579,7 @@ useEffect(() => {
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={form.codigoSku}
-                    onChange={(e) => setForm(f => ({ ...f, codigoSku: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, codigoSku: e.target.value }))}
                     placeholder="p. ej., GLI-1L"
                   />
                 </div>
@@ -539,58 +588,63 @@ useEffect(() => {
                   <div>
                     <label className="block text-sm text-neutral-700 mb-1">Costo USD</label>
                     <input
-                      type="number" step="0.01" min={0}
+                      type="number"
+                      step="0.01"
+                      min={0}
                       className="w-full border rounded-lg px-3 py-2"
                       value={form.costoBaseUsd ?? 0}
-                      onChange={(e) => setForm(f => ({ ...f, costoBaseUsd: Number(e.target.value) }))}
+                      onChange={(e) => setForm((f) => ({ ...f, costoBaseUsd: Number(e.target.value) }))}
                     />
                   </div>
                   <div>
                     <label className="block text-sm text-neutral-700 mb-1">% Margen</label>
                     <input
-                      type="number" step="0.01" min={0}
+                      type="number"
+                      step="0.01"
+                      min={0}
                       className="w-full border rounded-lg px-3 py-2"
                       value={form.margenVentaPorcentaje ?? 0}
-                      onChange={(e) => setForm(f => ({ ...f, margenVentaPorcentaje: Number(e.target.value) }))}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, margenVentaPorcentaje: Number(e.target.value) }))
+                      }
                     />
                   </div>
                   <div>
                     <label className="block text-sm text-neutral-700 mb-1">Precio BOB</label>
                     <input
-                      type="number" step="0.01" min={0}
+                      type="number"
+                      step="0.01"
+                      min={0}
                       className="w-full border rounded-lg px-3 py-2"
                       value={form.precioVentaBob ?? 0}
-                      onChange={(e) => setForm(f => ({ ...f, precioVentaBob: Number(e.target.value) }))}
+                      onChange={(e) => setForm((f) => ({ ...f, precioVentaBob: Number(e.target.value) }))}
                     />
                   </div>
                 </div>
-                {/* Imagen de la presentación (opcional) */}
-                {/* Imagen de la presentación (dropzone) */}
+
+                {/* Imagen (dropzone) */}
                 <div>
                   <label className="block text-sm text-neutral-700 mb-1">Imagen</label>
-
-                  {/* Dropzone */}
                   <div
                     role="button"
                     tabIndex={0}
                     onClick={pickFormFile}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pickFormFile(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") pickFormFile();
+                    }}
                     onDragOver={onDragOver}
                     onDragEnter={onDragOver}
                     onDragLeave={onDragLeave}
                     onDrop={onDrop}
                     className={[
                       "rounded-lg border-2 border-dashed p-4 flex items-center gap-4 cursor-pointer transition",
-                      isDragging ? "border-emerald-500 bg-emerald-50/40" : "border-neutral-300 hover:bg-neutral-50"
+                      isDragging
+                        ? "border-emerald-500 bg-emerald-50/40"
+                        : "border-neutral-300 hover:bg-neutral-50",
                     ].join(" ")}
                   >
-                    {/* Preview si hay archivo elegido */}
                     {preview ? (
-                      <img
-                        src={preview}
-                        alt="preview"
-                        className="w-16 h-16 object-cover rounded-md border"
-                      />
+                      <img src={preview} alt="preview" className="w-16 h-16 object-cover rounded-md border" />
                     ) : (
                       <div className="w-16 h-16 rounded-md border border-dashed border-neutral-300 flex items-center justify-center text-[10px] text-neutral-400">
                         Sin img
@@ -603,7 +657,6 @@ useEffect(() => {
                     </div>
                   </div>
 
-                  {/* input real oculto (formulario) */}
                   <input
                     ref={formFileRef}
                     type="file"
@@ -612,7 +665,6 @@ useEffect(() => {
                     onChange={onFormFileChange}
                   />
                 </div>
-
 
                 <div className="pt-2 flex gap-2">
                   <button type="submit" className="flex-1 h-10 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
@@ -626,7 +678,6 @@ useEffect(() => {
                     >
                       Cancelar
                     </button>
-
                   )}
                 </div>
               </form>

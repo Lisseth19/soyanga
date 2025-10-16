@@ -6,12 +6,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-
-// imports nuevos:
-import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/catalogo/presentaciones")
@@ -29,10 +29,9 @@ public class PresentacionControlador {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "codigoSku,asc") String sort,
             @RequestParam(defaultValue = "true") boolean soloActivos) {
+
         Sort s = parseSort(sort, "codigoSku");
         Pageable pageable = PageRequest.of(page, size, s);
-        // si soloActivos=true → filtra estadoActivo=true; si es false → no filtra
-        // (muestra todos)
         Boolean estadoActivo = soloActivos ? Boolean.TRUE : null;
         return presentacionServicio.buscar(idProducto, q, estadoActivo, pageable);
     }
@@ -69,15 +68,42 @@ public class PresentacionControlador {
     @PostMapping("/{idPresentacion}/codigos-barras")
     @ResponseStatus(HttpStatus.CREATED)
     public CodigoBarrasDTO agregarCodigo(@PathVariable Long idPresentacion,
-            @Valid @RequestBody CodigoBarrasCrearDTO dto) {
+                                         @Valid @RequestBody CodigoBarrasCrearDTO dto) {
         return presentacionServicio.agregarCodigo(idPresentacion, dto);
     }
 
     @DeleteMapping("/{idPresentacion}/codigos-barras/{idCodigoBarras}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void eliminarCodigo(@PathVariable Long idPresentacion,
-            @PathVariable Long idCodigoBarras) {
+                               @PathVariable Long idCodigoBarras) {
         presentacionServicio.eliminarCodigo(idPresentacion, idCodigoBarras);
+    }
+
+    // ===== IMAGEN =====
+    @PostMapping(path = "/{id}/imagen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.OK)
+    public PresentacionDTO subirImagen(@PathVariable Long id,
+                                       @RequestParam("file") MultipartFile file) {
+        try {
+            if (file == null || file.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Archivo requerido");
+            }
+            return presentacionServicio.subirImagen(id, file);
+        } catch (IllegalArgumentException e) {
+            // por ejemplo: presentación no encontrada
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage(), e);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // típico: columna imagen_url muy corta
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dato inválido al guardar la URL de la imagen", e);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo subir la imagen", e);
+        }
+    }
+
+    @DeleteMapping("/{id}/imagen")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminarImagen(@PathVariable Long id) {
+        presentacionServicio.eliminarImagen(id);
     }
 
     // util
@@ -88,18 +114,5 @@ public class PresentacionControlador {
         String field = parts[0].trim().isEmpty() ? fallback : parts[0].trim();
         boolean desc = parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc");
         return desc ? Sort.by(field).descending() : Sort.by(field).ascending();
-    }
-
-    @PostMapping("/{id}/imagen")
-    @ResponseStatus(HttpStatus.OK)
-    public PresentacionDTO subirImagen(@PathVariable Long id,
-            @RequestParam("file") MultipartFile file) {
-        return presentacionServicio.subirImagen(id, file);
-    }
-
-    @DeleteMapping("/{id}/imagen")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void eliminarImagen(@PathVariable Long id) {
-        presentacionServicio.eliminarImagen(id);
     }
 }

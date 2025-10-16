@@ -8,11 +8,19 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
-      "/api": {
-        target: "http://localhost:8084",
+      '/api': {
+        target: 'http://localhost:8084', // tu backend
         changeOrigin: true,
       },
-      '/static':'http://localhost:8084',
+      '/static': {
+        target: 'http://localhost:8084', // sirve archivos estáticos externos
+        changeOrigin: true,
+      },
+      // Si en algún momento usas /uploads en vez de /static:
+       '/uploads': {
+         target: 'http://localhost:8084',
+         changeOrigin: true,
+       },
     },
   },
   resolve: {
