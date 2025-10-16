@@ -5,7 +5,7 @@ import type { CompraEstado, Page } from "@/types/compras";
 // helper mínimo para mapear idMoneda -> código (USD/BS/…)
 async function fetchMapaMonedas(): Promise<Record<number, string>> {
   try {
-    const r = await fetch("/api/v1/monedas"); // ajusta si tu ruta difiere
+    const r = await fetch("/v1/monedas"); // ajusta si tu ruta difiere
     if (!r.ok) throw new Error();
     const arr = await r.json(); // espera [{idMoneda, codigo, simbolo, ...}]
     const map: Record<number, string> = {};
