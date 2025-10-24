@@ -7,6 +7,9 @@ import type {
     PresentacionPublicaDTO,
 } from "@/types/catalogo-publico";
 
+//  IMPORTARÁS esto cuando creemos el contexto del carrito (siguiente paso)
+import { useCart } from "@/context/cart"; // <-- lo crearemos luego
+
 /* ============ helpers ============ */
 function Precio({ value }: { value?: number | null }) {
     if (value == null) return <span className="text-muted">—</span>;
@@ -16,7 +19,7 @@ function Precio({ value }: { value?: number | null }) {
 function fmtContenido(v: PresentacionPublicaDTO) {
     const cantidad = v.contenidoPorUnidad != null ? String(v.contenidoPorUnidad) : null;
     const simbolo = (v as any).unidadSimbolo as string | undefined;
-    const nombre  = (v as any).unidadNombre  as string | undefined;
+    const nombre = (v as any).unidadNombre as string | undefined;
     const unidadStr = (simbolo && simbolo.trim()) || (nombre && nombre.trim()) || undefined;
     if (cantidad && unidadStr) return `${cantidad} ${unidadStr}`;
     if (cantidad) return cantidad;
@@ -43,61 +46,92 @@ function Gallery({
     }, [portada, presentaciones]);
 
     const [sel, setSel] = useState(0);
-    const [openDesc, setOpenDesc] = useState(false);
-    useEffect(() => setSel(0), [portada]);
+    const [openDesc, setOpenDesc] = useState<boolean>(!!desc); // overlay (solo desktop) abierto por defecto
+    const [dir, setDir] = useState<1 | -1>(1); // dirección de animación
+    const [enter, setEnter] = useState(true);  // fase de animación
+
+    useEffect(() => setSel(0), [portada, presentaciones?.length]);
+
+    // animación suave al cambiar selección
+    useEffect(() => {
+        setEnter(false);
+        const t = setTimeout(() => setEnter(true), 20);
+        return () => clearTimeout(t);
+    }, [sel, dir]);
+
+    const hasMany = thumbs.length > 1;
+
+    // Swipe en móvil
+    const [touchStartX, setTouchStartX] = useState<number | null>(null);
+    const onTouchStart = (e: React.TouchEvent) => setTouchStartX(e.touches[0].clientX);
+    const onTouchEnd = (e: React.TouchEvent) => {
+        if (touchStartX == null || !hasMany) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        if (Math.abs(dx) > 30) {
+            if (dx < 0) {
+                setDir(1);
+                setSel((i) => (i + 1) % thumbs.length);
+            } else {
+                setDir(-1);
+                setSel((i) => (i - 1 + thumbs.length) % thumbs.length);
+            }
+        }
+        setTouchStartX(null);
+    };
 
     return (
         <div className="space-y-3 md:max-w-[520px]">
-            <div className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--light-bg)]">
-                {/* Móvil: 4:3, object-contain (vista completa sin recorte) */}
-                <div className="block md:hidden aspect-[4/3] w-full bg-black/10">
+            <div
+                className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--light-bg)]"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    // Soporte teclado (PC), sin flechas visibles
+                    if (!hasMany) return;
+                    if (e.key === "ArrowLeft") {
+                        setDir(-1);
+                        setSel((i) => (i - 1 + thumbs.length) % thumbs.length);
+                    }
+                    if (e.key === "ArrowRight") {
+                        setDir(1);
+                        setSel((i) => (i + 1) % thumbs.length);
+                    }
+                }}
+            >
+                {/* Móvil & Desktop: 4/3 para que quepa overlay + thumbs sin scroll interno */}
+                <div
+                    className="aspect-[4/3] w-full bg-black/10"
+                    onTouchStart={onTouchStart}
+                    onTouchEnd={onTouchEnd}
+                >
                     {thumbs.length ? (
-                        <img
-                            src={`${thumbs[sel]}?m=${sel}`}
-                            alt="Imagen"
-                            className="h-full w-full select-none object-contain"
-                            draggable={false}
-                        />
-                    ) : (
-                        <div className="grid h-full w-full place-items-center text-sm text-muted">Sin imagen</div>
-                    )}
-                </div>
-                {/* Desktop: 1:1, object-contain */}
-                <div className="hidden md:block aspect-square w-full bg-black/10">
-                    {thumbs.length ? (
-                        <img
-                            src={`${thumbs[sel]}?d=${sel}`}
-                            alt="Imagen"
-                            className="h-full w-full select-none object-contain"
-                            draggable={false}
-                        />
+                        <div style={{ height: "100%", width: "100%", position: "relative" }}>
+                            <img
+                                key={sel}
+                                src={`${thumbs[sel]}?big=${sel}`}
+                                alt="Imagen"
+                                className="absolute inset-0 h-full w-full select-none object-contain"
+                                draggable={false}
+                                style={{
+                                    transition: "transform 320ms ease, opacity 320ms ease",
+                                    opacity: enter ? 1 : 0,
+                                    transform: enter ? "translateX(0)" : `translateX(${dir * 24}px)`,
+                                }}
+                            />
+                        </div>
                     ) : (
                         <div className="grid h-full w-full place-items-center text-sm text-muted">Sin imagen</div>
                     )}
                 </div>
 
-                {/* Botón descripción (desktop) */}
-                {desc && (
-                    <button
-                        onClick={() => setOpenDesc(true)}
-                        className="hidden md:inline-flex absolute bottom-3 right-3 rounded-full border border-[var(--border)] bg-[var(--surface)]/90 px-3 py-1.5 text-sm text-[var(--fg)] backdrop-blur transition hover:bg-[var(--surface)]"
-                        aria-haspopup="dialog"
-                        aria-expanded={openDesc}
-                        title="Ver descripción"
-                    >
-                        Descripción
-                    </button>
-                )}
-
-                {/* Overlay descripción (desktop) */}
-                {openDesc && desc && (
+                {/* Overlay descripción SOLO en desktop (md+) */}
+                {desc && openDesc && (
                     <div
-                        className="hidden md:flex absolute inset-0 items-end bg-black/20 backdrop-blur-sm"
+                        className="absolute inset-0 z-10 hidden md:flex items-end bg-black/20 backdrop-blur-sm"
                         role="dialog"
                         aria-modal="true"
                     >
                         <div className="m-3 max-h-[70%] w-full overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl">
-                            <div className="mb-3 flex items-center justify-between">
+                            <div className="mb-2 flex items-center justify-between">
                                 <h3 className="text-base font-semibold">Descripción</h3>
                                 <button
                                     onClick={() => setOpenDesc(false)}
@@ -110,15 +144,32 @@ function Gallery({
                         </div>
                     </div>
                 )}
+
+                {/* Botón para abrir descripción SOLO en desktop (cuando está cerrada) */}
+                {desc && !openDesc && (
+                    <button
+                        onClick={() => setOpenDesc(true)}
+                        className="absolute bottom-3 right-3 z-10 hidden md:inline-flex rounded-full border border-[var(--border)] bg-[var(--surface)]/90 px-3 py-1.5 text-sm text-[var(--fg)] backdrop-blur transition hover:bg-[var(--surface)]"
+                        aria-haspopup="dialog"
+                        aria-expanded={openDesc}
+                        title="Ver descripción"
+                    >
+                        Descripción
+                    </button>
+                )}
             </div>
 
-            {/* Thumbs */}
+            {/* Thumbs (PC y móvil) */}
             {thumbs.length > 1 && (
                 <div className="grid grid-cols-5 gap-2">
                     {thumbs.map((t, i) => (
                         <button
                             key={i}
-                            onClick={() => setSel(i)}
+                            onClick={() => {
+                                if (i === sel) return;
+                                setDir(i > sel ? 1 : -1);
+                                setSel(i);
+                            }}
                             className={`aspect-square overflow-hidden rounded-lg border ${
                                 sel === i ? "border-emerald-600" : "border-[var(--border)] hover:border-emerald-700/60"
                             }`}
@@ -139,7 +190,13 @@ function Gallery({
 }
 
 /* ============ Tarjeta de Presentación ============ */
-function PresentacionCard({ v }: { v: PresentacionPublicaDTO }) {
+function PresentacionCard({
+                              v,
+                              onAdd,
+                          }: {
+    v: PresentacionPublicaDTO;
+    onAdd: (v: PresentacionPublicaDTO) => void;
+}) {
     return (
         <div className="flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
             <div className="no-copy-img aspect-square w-full overflow-hidden rounded-lg bg-black/10">
@@ -168,7 +225,7 @@ function PresentacionCard({ v }: { v: PresentacionPublicaDTO }) {
             <div className="mt-1">
                 <button
                     className="w-full rounded-full border border-[var(--primary-color)] px-3 py-1.5 text-[12px] text-[var(--primary-color)] transition hover:bg-[var(--primary-color)] hover:text-white"
-                    onClick={() => alert(`Agregar ${v.codigoSku ?? v.idPresentacion} a cotización`)}
+                    onClick={() => onAdd(v)}
                 >
                     Agregar
                 </button>
@@ -183,6 +240,10 @@ export default function ProductoPublico() {
     const [p, setP] = useState<ProductoPublicoDetalleDTO | null>(null);
     const [err, setErr] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // ✅ del contexto que crearemos enseguida
+    const { addItem } = useCart();
+    const [added, setAdded] = useState<string | null>(null); // toast simple
 
     useEffect(() => {
         const idNum = Number(id);
@@ -203,12 +264,27 @@ export default function ProductoPublico() {
         };
     }, [id]);
 
+    function handleAdd(v: PresentacionPublicaDTO) {
+        if (!p) return;
+        addItem({
+            idPresentacion: v.idPresentacion,
+            nombreProducto: p.nombreProducto,
+            codigoSku: v.codigoSku ?? null,
+            contenido: fmtContenido(v),
+            precioUnitBob: v.precioVentaBob ?? null,
+            imagenUrl: v.imagenUrl || p.imagenUrl || null,
+            cantidad: 1,
+        });
+        setAdded(`${p.nombreProducto} – ${v.codigoSku ?? "#" + v.idPresentacion}`);
+        setTimeout(() => setAdded(null), 1600);
+    }
+
     if (loading) {
         return (
             <section className="mx-auto max-w-7xl px-4 py-8">
                 <div className="grid gap-6 md:grid-cols-2">
                     <div className="animate-pulse overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--light-bg)]">
-                        <div className="aspect-[4/3] w-full bg-black/10 md:aspect-square" />
+                        <div className="aspect-[4/3] w-full bg-black/10 md:aspect-[4/3]" />
                     </div>
                     <div className="space-y-3">
                         <div className="h-8 w-2/3 rounded bg-black/10" />
@@ -235,12 +311,18 @@ export default function ProductoPublico() {
             </nav>
 
             <div className="grid gap-8 md:grid-cols-2">
-                {/* Izquierda: galería */}
-                <Gallery portada={p.imagenUrl} presentaciones={p.presentaciones ?? []} desc={p.descripcion} />
+                {/* Izquierda: galería STICKY */}
+                <div className="lg:sticky lg:top-20 lg:self-start">
+                    <Gallery
+                        portada={p.imagenUrl}
+                        presentaciones={p.presentaciones ?? []}
+                        desc={p.descripcion ?? null}
+                    />
+                </div>
 
                 {/* Derecha */}
                 <div className="min-w-0">
-                    {/* TÍTULO primero */}
+                    {/* Título */}
                     <h1 className="text-xl font-bold text-fg sm:text-2xl md:text-3xl">{p.nombreProducto}</h1>
 
                     {/* Chips */}
@@ -257,12 +339,20 @@ export default function ProductoPublico() {
                         )}
                     </div>
 
-                    {/* Presentaciones (2 columnas también en móvil, como pediste) */}
+                    {/* Principio activo — ANTES de las tarjetas */}
+                    {p.principioActivo && (
+                        <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                            <div className="text-sm font-semibold text-fg">Principio activo</div>
+                            <div className="mt-1 whitespace-pre-line text-sm text-muted">{p.principioActivo}</div>
+                        </div>
+                    )}
+
+                    {/* Presentaciones */}
                     <div className="mt-5">
                         {p.presentaciones?.length ? (
                             <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                 {p.presentaciones.map((v) => (
-                                    <PresentacionCard key={v.idPresentacion} v={v} />
+                                    <PresentacionCard key={v.idPresentacion} v={v} onAdd={handleAdd} />
                                 ))}
                             </div>
                         ) : (
@@ -272,20 +362,23 @@ export default function ProductoPublico() {
                         )}
                     </div>
 
-                    {/* Principio activo (después de tarjetas) */}
-                    {p.principioActivo && (
-                        <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                            <div className="text-sm font-semibold text-fg">Principio activo</div>
-                            <div className="mt-1 whitespace-pre-line text-sm text-muted">{p.principioActivo}</div>
-                        </div>
+                    {/* Descripción SOLO en móvil, debajo de las tarjetas */}
+                    {p.descripcion && (
+                        <details open className="md:hidden mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                            <summary className="cursor-pointer list-none text-sm font-semibold">
+                                Descripción
+                            </summary>
+                            <div className="mt-2 whitespace-pre-line leading-relaxed text-muted">
+                                {p.descripcion}
+                            </div>
+                        </details>
                     )}
 
-                    {/* MÓVIL: Descripción en acordeón */}
-                    {p.descripcion && (
-                        <details className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 md:hidden">
-                            <summary className="cursor-pointer list-none text-sm font-semibold">Descripción</summary>
-                            <div className="mt-2 whitespace-pre-line leading-relaxed text-muted">{p.descripcion}</div>
-                        </details>
+                    {/* Toast simple */}
+                    {added && (
+                        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2 shadow">
+                            <span className="text-sm">Agregado: {added}</span>
+                        </div>
                     )}
                 </div>
             </div>
