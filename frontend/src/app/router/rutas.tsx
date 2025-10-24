@@ -13,6 +13,8 @@ import LoginPage from "@/paginas/Login";
 import InicioPublico from "@/paginas/publico/InicioPublico";
 import CatalogoPublico from "@/paginas/publico/CatalogoPublico";
 import ProductoPublico from "@/paginas/publico/ProductoPublico";
+import ContactoPublico from "@/paginas/publico/Contacto";
+import CartPage from "@/paginas/publico/Cotizacion"; //  Cotización
 
 // Páginas admin
 import Inicio from "@/paginas/Inicio";
@@ -44,6 +46,7 @@ import ProveedoresPage from "@/paginas/proveedor/Proveedores";
 import UsuariosPage from "@/paginas/seguridad/Usuarios";
 import RolesPage from "@/paginas/seguridad/Roles";
 import PermisosPage from "@/paginas/seguridad/Permisos";
+import MetodosPagoPage from "@/paginas/publico/MetodosPago";
 
 export const router = createBrowserRouter([
   // ============================
@@ -56,8 +59,10 @@ export const router = createBrowserRouter([
       { index: true, element: <InicioPublico /> },
       { path: "inicio", element: <InicioPublico /> },
       { path: "catalogo", element: <CatalogoPublico /> },
-      // Detalle por **ID**
       { path: "producto/:id", element: <ProductoPublico /> },
+      { path: "metodos", element: <MetodosPagoPage /> },
+      { path: "contacto", element: <ContactoPublico /> },
+      { path: "cotizacion", element: <CartPage /> }, //  NUEVO
       { path: "*", element: <div className="p-6 max-w-6xl mx-auto">Página no encontrada.</div> },
     ],
   },
@@ -71,9 +76,9 @@ export const router = createBrowserRouter([
   // ============================
   {
     element: (
-      <RequireAuth>
-        <AppLayout />
-      </RequireAuth>
+        <RequireAuth>
+          <AppLayout />
+        </RequireAuth>
     ),
     children: [
       { path: "/inicio", element: <Inicio /> },
