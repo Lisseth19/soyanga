@@ -48,14 +48,16 @@ export default function TopNav() {
           "
           style={{ WebkitOverflowScrolling: "touch" }}
         >
+          <TabLink to="/catalogo">Catálogo</TabLink>
+          <TabLink to="/config/estructura/sucursales">Sucursales</TabLink>
+          <TabLink to="/config/estructura/almacenes">Almacenes</TabLink>
+          <TabLink to="/catalogo/categorias">Categorías</TabLink>
+          <TabLink to="/catalogo/productos">Productos</TabLink>
+          <TabLink to="/config/finanzas/monedas">Monedas</TabLink>
+          <TabLink to="/catalogo/unidades">Unidades</TabLink>
+          <TabLink to="/catalogo/presentaciones">Presentaciones</TabLink>
           <TabLink to="/inventario/lote">Inventario por lote</TabLink>
-          <TabLink to="/sucursales">Sucursales</TabLink>
-          <TabLink to="/almacenes">Almacenes</TabLink>
-          <TabLink to="/categorias">Categorias</TabLink>
-          <TabLink to="/inventario/productos">Productos</TabLink>
-          <TabLink to="/monedas">Monedas</TabLink>
           <TabLink to="/api-health">API Health</TabLink>
-           <TabLink to="/catalogo/unidades">Unidades</TabLink>
           {/* agrega las que necesites */}
         </div>
       </div>

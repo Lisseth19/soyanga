@@ -1,12 +1,27 @@
-import type {ReactNode} from 'react';
+import type { ReactNode } from "react";
 
-type Props = { children: ReactNode; className?: string }
+type Variant = "default" | "tile";
 
-export default function Tarjeta({ children, className = '' }: Props) {
-    return (
-        <div className={`rounded-xl border bg-white text-gray-900 shadow-sm
-                     dark:bg-neutral-900 dark:text-neutral-100 ${className}`}>
-            {children}
-        </div>
-    )
+type Props = {
+  children: ReactNode;
+  className?: string;
+  /** 'tile' fuerza tarjeta clara en cualquier tema */
+  variant?: Variant;
+};
+
+export default function Tarjeta({
+  children,
+  className = "",
+  variant = "default",
+}: Props) {
+  const base = "rounded-xl border shadow-sm transition";
+  const variants: Record<Variant, string> = {
+    // comportamiento actual
+    default:
+      "bg-white text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100",
+    // SIEMPRE clara (lo que queremos para el catálogo)
+    tile: "bg-white text-neutral-900 dark:bg-white dark:text-neutral-900",
+  };
+
+  return <div className={`${base} ${variants[variant]} ${className}`}>{children}</div>;
 }

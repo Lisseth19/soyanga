@@ -184,7 +184,7 @@ export default function RolesPage() {
                         }}
                     />
                     {can("roles:crear") && (
-                        <button className="bg-black text-white px-3 py-2 rounded" onClick={() => setMostrarForm({ modo: "crear" })}>
+                        <button className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setMostrarForm({ modo: "crear" })}>
                             + Nuevo rol
                         </button>
                     )}
@@ -464,7 +464,7 @@ function RolFormModal({
                         Cancelar
                     </button>
                     {(!isEdit || canActualizar) && (
-                        <button type="submit" className="px-3 py-2 bg-black text-white rounded" disabled={saving}>
+                        <button type="submit" className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white" disabled={saving}>
                             {isEdit ? "Guardar" : "Crear"}
                         </button>
                     )}

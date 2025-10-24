@@ -14,7 +14,7 @@ export default function CompraNuevaPage() {
   const [form, setForm] = useState<CompraCrearDTO>({
     idProveedor: 0,
     idMoneda: 0,
-    tipoCambioUsado: 1,
+    tipoCambioUsado: 0,
   });
 
   // combos
@@ -30,7 +30,12 @@ export default function CompraNuevaPage() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingCat, setLoadingCat] = useState(false);
-
+  const canSubmit =
+    !loading &&
+    !loadingCat &&
+    form.idProveedor > 0 &&
+    form.idMoneda > 0 &&
+    Number(form.tipoCambioUsado) > 0;
   useEffect(() => {
     // cargar proveedores y monedas desde TUS servicios
     (async () => {
@@ -53,12 +58,6 @@ export default function CompraNuevaPage() {
         }));
         setOpsMon(monOps);
 
-        // defaults si vienen vacíos
-        setForm((f) => ({
-          ...f,
-          idProveedor: f.idProveedor || (provOps[0]?.value ?? 0),
-          idMoneda: f.idMoneda || (monOps[0]?.value ?? 0),
-        }));
       } catch (e: any) {
         setErr(e.message || "No se pudieron cargar catálogos");
       } finally {
@@ -70,6 +69,21 @@ export default function CompraNuevaPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+
+    // ✅ validaciones previas
+    if (!(form.idProveedor > 0)) {
+      setErr("Selecciona un proveedor.");
+      return;
+    }
+    if (!(form.idMoneda > 0)) {
+      setErr("Selecciona una moneda.");
+      return;
+    }
+    if (!(Number(form.tipoCambioUsado) > 0)) {
+      setErr("Ingresa un tipo de cambio mayor a 0.");
+      return;
+    }
+
     setLoading(true);
     try {
       const dto: CompraCrearDTO = {
@@ -115,19 +129,13 @@ export default function CompraNuevaPage() {
               <select
                 className="w-full border rounded-lg px-3 py-2 appearance-none"
                 value={form.idProveedor}
-                onChange={(e) =>
-                  setForm({ ...form, idProveedor: Number(e.target.value) })
-                }
+                onChange={(e) => setForm({ ...form, idProveedor: Number(e.target.value) })}
                 required
                 disabled={loadingCat}
               >
-                {provFiltrados.length === 0 && (
-                  <option value={0}>Sin resultados</option>
-                )}
+                <option value={0} disabled>Seleccione un proveedor…</option>  {/* ←  placeholder */}
                 {provFiltrados.map((op) => (
-                  <option key={op.value} value={op.value}>
-                    {op.label}
-                  </option>
+                  <option key={op.value} value={op.value}>{op.label}</option>
                 ))}
               </select>
               <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-neutral-400">
@@ -181,19 +189,13 @@ export default function CompraNuevaPage() {
                 <select
                   className="w-full border rounded-lg px-3 py-2 appearance-none"
                   value={form.idMoneda}
-                  onChange={(e) =>
-                    setForm({ ...form, idMoneda: Number(e.target.value) })
-                  }
+                  onChange={(e) => setForm({ ...form, idMoneda: Number(e.target.value) })}
                   required
                   disabled={loadingCat}
                 >
-                  {monFiltradas.length === 0 && (
-                    <option value={0}>Sin resultados</option>
-                  )}
+                  <option value={0} disabled>Seleccione una moneda…</option>   {/* ←  placeholder */}
                   {monFiltradas.map((op) => (
-                    <option key={op.value} value={op.value}>
-                      {op.label}
-                    </option>
+                    <option key={op.value} value={op.value}>{op.label}</option>
                   ))}
                 </select>
                 <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-neutral-400">
@@ -209,16 +211,15 @@ export default function CompraNuevaPage() {
               <label className="block text-sm mb-1">Tipo de Cambio</label>
               <input
                 type="number"
-                step="0.1"
+                step="0.0001"
                 min="0"
                 className="w-full border rounded-lg px-3 py-2"
                 placeholder="Ingresar tipo de cambio"
-                value={form.tipoCambioUsado}
-                onChange={(e) =>
-                  setForm({ ...form, tipoCambioUsado: Number(e.target.value) })
-                }
+                value={form.tipoCambioUsado || ""}  // muestra vacío si es 0
+                onChange={(e) => setForm({ ...form, tipoCambioUsado: Number(e.target.value) })}
                 required
               />
+
             </div>
             <div>
               <label className="block text-sm mb-1">Estado de Compra</label>
@@ -255,8 +256,8 @@ export default function CompraNuevaPage() {
 
         <div className="flex gap-2">
           <button
-            disabled={loading || loadingCat || !form.idProveedor || !form.idMoneda}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg disabled:opacity-60"
+            disabled={!canSubmit}
+            className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
           >
             Crear
           </button>

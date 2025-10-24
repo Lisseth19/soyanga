@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 
@@ -72,6 +73,12 @@ public class CompraControlador {
     public CompraRespuestaDTO anular(@PathVariable Long id, @RequestParam(required = false) String motivo) {
         // si quieres dejar constancia, apéndalo en observaciones dentro del servicio
         return servicio.cambiarEstado(id, "anulada");
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminar(@PathVariable Long id) {
+        servicio.eliminarSiVacia(id); // o servicio.eliminar(id) si no quieres validar
     }
 
 }
