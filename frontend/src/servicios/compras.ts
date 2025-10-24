@@ -79,4 +79,9 @@ export const comprasService = {
       params: motivo ? { motivo } : {},
     });
   },
+   eliminar(id: number) {
+    // BASE = "/v1/compras"  -> con baseURL /api en http => /api/v1/compras/{id}
+    return http.del(`${BASE}/${id}`);
+  },
+
 };

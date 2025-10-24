@@ -3,7 +3,8 @@ import { comprasService } from "@/servicios/compras";
 import { presentacionService } from "@/servicios/presentacion";
 import type { Compra, CompraDetalleCrearDTO, CompraEstado } from "@/types/compras";
 import type { PresentacionDTO } from "@/types/presentacion";
-import { Calendar, Pencil, Trash2, Check, X } from "lucide-react";
+import { Calendar, Pencil, Trash2, Check, X, Link as LinkIcon } from "lucide-react";
+import { Link as RouterLink } from "react-router-dom";
 
 type PresOpcion = { value: number; label: string };
 
@@ -17,6 +18,7 @@ function presToLabel(p: Partial<PresentacionDTO>): string {
 }
 
 const ESTADOS_BLOQUEADOS: CompraEstado[] = ["enviada", "parcial", "recibida", "anulada"];
+
 
 export default function CompraDetallePage() {
   const id = Number(window.location.pathname.split("/").pop());
@@ -42,6 +44,17 @@ export default function CompraDetallePage() {
   const etaEditRef = useRef<HTMLInputElement>(null);
 
   const accionesBloqueadas = !!data && ESTADOS_BLOQUEADOS.includes(data.estado);
+  // --- borrador vacío: pendiente + 0 ítems ---
+  const itemsCount = useMemo(
+    () => (data ? (data.totalItems ?? data.items?.length ?? 0) : 0),
+    [data]
+  );
+
+  // Es borrador vacío sólo si está pendiente y no tiene ítems
+  const isDraftEmpty = !!data && data.estado === "pendiente" && itemsCount === 0;
+
+  // Flag para eliminar automáticamente si el usuario sale sin agregar ítems
+  const autoDeleteRef = useRef(false);
 
   // cargar compra
   async function load() {
@@ -50,6 +63,7 @@ export default function CompraDetallePage() {
       setErr(null);
       const r = await comprasService.obtener(id);
       setData(r);
+      autoDeleteRef.current = r?.estado === "pendiente" && ((r?.totalItems ?? r?.items?.length ?? 0) === 0);
 
       // asegura labels para los ids que ya están en la compra
       const ids = Array.from(new Set(r.items.map((it) => it.idPresentacion)));
@@ -109,6 +123,27 @@ export default function CompraDetallePage() {
     buscarPresentaciones(presFiltro);
   }, [presFiltro]);
 
+  useEffect(() => {
+    return () => {
+      // si se sale/desmonta y sigue siendo borrador vacío, elimina
+      if (autoDeleteRef.current) {
+        comprasService.eliminar(id).catch(() => { });
+      }
+    };
+  }, [id]);
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (autoDeleteRef.current) {
+        e.preventDefault();
+        e.returnValue = ""; // dispara confirm del navegador
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload as any);
+  }, []);
+
+
+
   async function cambiarEstado(nuevo: CompraEstado) {
     if (!data) return;
     await comprasService.cambiarEstado(data.idCompra, nuevo);
@@ -119,6 +154,7 @@ export default function CompraDetallePage() {
     if (!data) return;
     await comprasService.agregarItem(data.idCompra, dto);
     // backend ya fusiona si existe -> recarga
+    autoDeleteRef.current = false; // ya no es borrador vacío
     await load();
   }
 
@@ -190,15 +226,29 @@ export default function CompraDetallePage() {
               >
                 Anular
               </button>
+              {isDraftEmpty && data && (
+                <button
+                  className="px-3 py-2 rounded border border-red-300 text-red-600 hover:bg-red-50"
+                  onClick={async () => {
+                    await comprasService.eliminar(data.idCompra).catch(() => { });
+                    window.location.assign("/compras/pedidos");
+                  }}
+                  title="Eliminar este pedido sin ítems"
+                >
+                  Eliminar borrador
+                </button>
+              )}
+
               {/* Recepcionar en verde */}
-              <a
-                href={`/compras/${data.idCompra}/recepciones/nueva`}
+              <RouterLink
+                to="recepciones/nueva"   // relativo a /compras/pedidos/:id  → /compras/pedidos/:id/recepciones/nueva
                 className="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center"
-                aria-disabled={['anulada','recibida'].includes(data.estado)}
+                aria-disabled={['anulada', 'recibida'].includes(data?.estado ?? '')}
                 title="Registrar recepción para esta compra"
               >
                 Recepcionar
-              </a>
+              </RouterLink>
+
 
             </div>
           </div>

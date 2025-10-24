@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { comprasService } from "@/servicios/compras";
 import type { CompraEstado, Page } from "@/types/compras";
+import { Link } from "react-router-dom";
 
 // helper mínimo para mapear idMoneda -> código (USD/BS/…)
 async function fetchMapaMonedas(): Promise<Record<number, string>> {
@@ -84,12 +85,12 @@ export default function ComprasListaPage() {
           Órdenes de Compra
         </div>
 
-        <a
-          href="/compras/nueva"
+        <Link
+          to="pedidos/nuevo"             // relativo a /compras  -> /compras/pedidos/nuevo
           className="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center"
         >
           + Nueva Orden de Compra
-        </a>
+        </Link>
       </div>
 
       <div className="flex flex-wrap gap-3 items-end">
