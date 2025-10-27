@@ -20,6 +20,7 @@ public class VentaTrazabilidadDTO {
     private BigDecimal descuentoTotalBob;
     private BigDecimal totalNetoBob;
     private String condicionDePago; // contado/credito
+ //   private BigDecimal interesCredito;
     private LocalDate fechaVencimientoCredito;
     private Long idAlmacenDespacho;
     private String estadoVenta;     // enum .name()

@@ -10,11 +10,14 @@ import com.soyanga.soyangabackend.repositorio.cobros.AplicacionAnticipoRepositor
 import com.soyanga.soyangabackend.repositorio.cobros.CuentaPorCobrarRepositorio;
 import com.soyanga.soyangabackend.repositorio.ventas.VentaRepositorio;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -28,79 +31,76 @@ public class AnticipoAplicacionServicio {
     @Transactional
     public AplicarAnticipoRespuestaDTO aplicar(Long idAnticipo, AplicarAnticipoDTO dto) {
         var anticipo = anticipoRepo.findById(idAnticipo)
-                .orElseThrow(() -> new IllegalArgumentException("Anticipo no encontrado: " + idAnticipo));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Anticipo no encontrado: " + idAnticipo));
 
-        // Enums: usar comparación por identidad
         if (anticipo.getEstadoAnticipo() == Anticipo.EstadoAnticipo.anulado) {
-            throw new IllegalArgumentException("El anticipo está anulado");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El anticipo está anulado");
         }
 
         var venta = ventaRepo.findById(dto.getIdVenta())
-                .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada: " + dto.getIdVenta()));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada: " + dto.getIdVenta()));
 
-        // Debe existir CxC (venta crédito) para aplicar
+        if (!Objects.equals(anticipo.getIdCliente(), venta.getIdCliente())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El anticipo pertenece a otro cliente");
+        }
+
         var cxc = cxcRepo.findByIdVenta(venta.getIdVenta())
-                .orElseThrow(() -> new IllegalArgumentException("La venta no es a crédito o no tiene CxC"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "La venta no es a crédito o no tiene CxC"));
 
-        // Total histórico aplicado a este anticipo
         BigDecimal aplicadoHist = aplicacionRepo.totalAplicadoPorAnticipo(idAnticipo);
-        if (aplicadoHist == null) aplicadoHist = BigDecimal.ZERO; // por si acaso
+        if (aplicadoHist == null) aplicadoHist = BigDecimal.ZERO;
 
         BigDecimal saldoAnticipoAntes = anticipo.getMontoBob().subtract(aplicadoHist);
 
-        if (dto.getMontoAplicadoBob().compareTo(saldoAnticipoAntes) > 0) {
-            throw new IllegalArgumentException("Saldo del anticipo insuficiente. Saldo: " + saldoAnticipoAntes);
+        // ✅ NUEVO: validar monto
+        BigDecimal monto = dto.getMontoAplicadoBob();
+        if (monto == null || monto.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El monto a aplicar debe ser mayor que 0");
         }
-        if (dto.getMontoAplicadoBob().compareTo(cxc.getMontoPendienteBob()) > 0) {
-            throw new IllegalArgumentException("Monto excede el pendiente de la CxC. Pendiente: " + cxc.getMontoPendienteBob());
+        if (monto.compareTo(saldoAnticipoAntes) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Saldo del anticipo insuficiente. Saldo: " + saldoAnticipoAntes);
+        }
+        if (monto.compareTo(cxc.getMontoPendienteBob()) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Monto excede el pendiente de la CxC. Pendiente: " + cxc.getMontoPendienteBob());
         }
 
-        BigDecimal cxcPendienteAntes = cxc.getMontoPendienteBob();
-
-        // 1) Insert aplicación
         var apl = AplicacionAnticipo.builder()
                 .idAnticipo(idAnticipo)
                 .idVenta(venta.getIdVenta())
-                .montoAplicadoBob(dto.getMontoAplicadoBob())
+                .montoAplicadoBob(monto) // usar la variable
                 .fechaAplicacion(LocalDateTime.now())
                 .build();
         apl = aplicacionRepo.save(apl);
 
-        // 2) Actualizar CxC (usando enums)
-        cxc.setMontoPendienteBob(cxc.getMontoPendienteBob().subtract(dto.getMontoAplicadoBob()));
+        BigDecimal cxcPendienteAntes = cxc.getMontoPendienteBob();
+        cxc.setMontoPendienteBob(cxcPendienteAntes.subtract(monto));
         if (cxc.getMontoPendienteBob().signum() == 0) {
             cxc.setEstadoCuenta(CuentaPorCobrar.EstadoCuenta.pagado);
-        } else {
-            // si ya estaba vencido, mantener; sino, parcial
-            if (cxc.getEstadoCuenta() != CuentaPorCobrar.EstadoCuenta.vencido) {
-                cxc.setEstadoCuenta(CuentaPorCobrar.EstadoCuenta.parcial);
-            }
+        } else if (cxc.getEstadoCuenta() != CuentaPorCobrar.EstadoCuenta.vencido) {
+            cxc.setEstadoCuenta(CuentaPorCobrar.EstadoCuenta.parcial);
         }
         cxcRepo.save(cxc);
 
-        // 3) Actualizar estado del anticipo (enum)
-        BigDecimal aplicadoNuevo = aplicadoHist.add(dto.getMontoAplicadoBob());
-        BigDecimal saldoAnticipoDespues = anticipo.getMontoBob().subtract(aplicadoNuevo);
-
-        if (saldoAnticipoDespues.signum() == 0) {
-            anticipo.setEstadoAnticipo(Anticipo.EstadoAnticipo.aplicado_total);
-        } else {
-            anticipo.setEstadoAnticipo(Anticipo.EstadoAnticipo.parcialmente_aplicado);
-        }
+        BigDecimal saldoAnticipoDespues = saldoAnticipoAntes.subtract(monto);
+        anticipo.setEstadoAnticipo(
+                saldoAnticipoDespues.signum() == 0
+                        ? Anticipo.EstadoAnticipo.aplicado_total
+                        : Anticipo.EstadoAnticipo.parcialmente_aplicado
+        );
         anticipoRepo.save(anticipo);
 
         return AplicarAnticipoRespuestaDTO.builder()
                 .idAplicacionAnticipo(apl.getIdAplicacionAnticipo())
                 .idAnticipo(idAnticipo)
                 .idVenta(venta.getIdVenta())
-                .montoAplicadoBob(dto.getMontoAplicadoBob())
+                .montoAplicadoBob(monto)
                 .fechaAplicacion(apl.getFechaAplicacion())
                 .saldoAnticipoAntes(saldoAnticipoAntes)
                 .saldoAnticipoDespues(saldoAnticipoDespues)
                 .cxcPendienteAntes(cxcPendienteAntes)
                 .cxcPendienteDespues(cxc.getMontoPendienteBob())
-                .estadoAnticipo(anticipo.getEstadoAnticipo().name()) // String en DTO
-                .estadoCxc(cxc.getEstadoCuenta().name())             // String en DTO
+                .estadoAnticipo(anticipo.getEstadoAnticipo().name())
+                .estadoCxc(cxc.getEstadoCuenta().name())
                 .build();
     }
 }

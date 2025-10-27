@@ -12,6 +12,11 @@ public class VentaRespuestaDTO {
     private BigDecimal descuentoTotalBob;
     private BigDecimal totalNetoBob;
 
+    // NUEVO (opcionales, informativos)
+    private BigDecimal impuestoPorcentaje;
+    private BigDecimal impuestoMontoBob;
+    private BigDecimal interesCredito;
+
     private List<ItemAsignado> asignaciones; // breakdown por lotes (opcional para debug)
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
