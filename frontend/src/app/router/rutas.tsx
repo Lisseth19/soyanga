@@ -4,6 +4,11 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 // Layouts
 import AppLayout from "../layout/Layout";              // layout ADMIN
 import PublicLayout from "../layout/PublicLayout";     // layout PÚBLICO
+import ComprasLayout from "../layout/ComprasLayout";   // Layout del módulo Compras
+import SeguridadLayout from "../layout/SeguridadLayout";
+import SettingsLayout from "../layout/SettingsLayout";
+// NUEVO: Layout del módulo Ventas
+import VentasLayout from "../layout/VentasLayout";
 
 // Auth
 import RequireAuth from "@/componentes/RequireAuth";
@@ -15,22 +20,19 @@ import CatalogoPublico from "@/paginas/publico/CatalogoPublico";
 import ProductoPublico from "@/paginas/publico/ProductoPublico";
 import ContactoPublico from "@/paginas/publico/Contacto";
 import CartPage from "@/paginas/publico/Cotizacion"; //  Cotización
+import MetodosPagoPage from "@/paginas/publico/MetodosPago";
 
 // Páginas admin
 import Inicio from "@/paginas/Inicio";
 import SaludAPI from "@/paginas/Health";
 import InventarioPorLotePage from "@/paginas/inventario/InventarioPorLote";
-//import SucursalesList from "@/paginas/sucursales/SucursalesList";
+// import SucursalesList from "@/paginas/sucursales/SucursalesList";
 import NuevaSucursal from "@/paginas/sucursales/NuevaSucursal";
 import EditarSucursal from "@/paginas/sucursales/EditarSucursal";
-//import AlmacenesPage from "@/paginas/almacenes/almacen";
-//import CategoriasPage from "@/paginas/categorias/Categorias";
-//import MonedasPage from "@/paginas/moneda/Monedas";
-//import ProductosPage from "@/paginas/inventario/Productos";
-
-// Catálogo interno
-//import UnidadesPage from "@/paginas/catalogo/Unidades";
-//import PresentacionesPage from "@/paginas/catalogo/Presentaciones";
+// import AlmacenesPage from "@/paginas/almacenes/almacen";
+// import CategoriasPage from "@/paginas/categorias/Categorias";
+// import MonedasPage from "@/paginas/moneda/Monedas";
+// import ProductosPage from "@/paginas/inventario/Productos";
 
 // Compras
 import ComprasListaPage from "@/paginas/compras/ComprasLista";
@@ -41,14 +43,15 @@ import RecepcionNuevaPage from "@/paginas/compras/RecepcionNueva";
 // Ventas
 import VentasListado from "@/paginas/ventas/VentasListado";
 import VentaNueva from "@/paginas/ventas/VentaNueva";
-//import VentaDetalle from "@/paginas/ventas/VentaDetalle";
-//import VentaTrazabilidad from "@/paginas/ventas/VentaTrazabilidad"; // si aún no la tienes, coméntala
+// import VentaDetalle from "@/paginas/ventas/VentaDetalle";
+// import VentaTrazabilidad from "@/paginas/ventas/VentaTrazabilidad"; // si aún no la tienes, déjalo comentado
 
-//Anticipos
+// Anticipos / Cobros (viven dentro de Ventas)
 import AnticiposListado from "@/paginas/anticipos/AnticiposListado";
 import AnticipoDetalle from "@/paginas/anticipos/AnticipoDetalle";
-//import { AplicarAnticipoModal } from "@/paginas/anticipos/AplicarAnticipoModal";
+// import { AplicarAnticipoModal } from "@/paginas/anticipos/AplicarAnticipoModal";
 import { AnticipoCrearForm } from "@/paginas/anticipos/AnticipoCrearForm";
+import CxcListado from "@/paginas/cobros/CxcListado.tsx";
 
 // CRM básico
 import ClientesPage from "@/paginas/cliente/Clientes";
@@ -58,18 +61,12 @@ import ProveedoresPage from "@/paginas/proveedor/Proveedores";
 import UsuariosPage from "@/paginas/seguridad/Usuarios";
 import RolesPage from "@/paginas/seguridad/Roles";
 import PermisosPage from "@/paginas/seguridad/Permisos";
-import MetodosPagoPage from "@/paginas/publico/MetodosPago";
-
-import SettingsLayout from "../layout/SettingsLayout";
+import AuditoriasPage from "@/paginas/seguridad/Auditorias";
 
 import SucursalesList from "@/paginas/sucursales/SucursalesList";
 import AlmacenesPage from "@/paginas/almacenes/almacen";
 import MonedasPage from "@/paginas/moneda/Monedas";
 import TiposCambioPage from "@/paginas/finanzas/TiposCambio";
-
-//CxC
-//import {AplicarPagoModal} from "@/paginas/cobros/AplicarPagoModal.tsx";
-import CxcListado from "@/paginas/cobros/CxcListado.tsx";
 
 import CatalogoIndex from "@/paginas/catalogo/Index";
 import CategoriasPage from "@/paginas/categorias/Categorias";
@@ -78,10 +75,6 @@ import UnidadesPage from "@/paginas/catalogo/Unidades";
 import PresentacionesPage from "@/paginas/catalogo/Presentaciones";
 import CodigosBarrasPage from "@/paginas/catalogo/CodigosBarras";
 
-// Layout del módulo Compras
-import ComprasLayout from "../layout/ComprasLayout";
-import SeguridadLayout from "../layout/SeguridadLayout";
-import AuditoriasPage from "@/paginas/seguridad/Auditorias";
 export const router = createBrowserRouter([
   // ============================
   // BLOQUE PÚBLICO (NO requiere auth)
@@ -118,7 +111,7 @@ export const router = createBrowserRouter([
       { path: "/inicio", element: <Inicio /> },
       { path: "/salud", element: <SaludAPI /> },
 
-      // === Configuración y Catálogo (nuevo) ===
+      // === Configuración y Catálogo (nuevo)
       {
         path: "/config",
         element: <SettingsLayout />,
@@ -141,6 +134,8 @@ export const router = createBrowserRouter([
           { path: "codigos-barras", element: <CodigosBarrasPage /> },
         ],
       },
+
+      // === Compras (ANIDADO CON LAYOUT)
       {
         path: "/compras",
         element: <ComprasLayout />,
@@ -160,9 +155,8 @@ export const router = createBrowserRouter([
           { path: "pedidos/:id/recepciones/nueva", element: <RecepcionNuevaPage /> },
 
           // ---------- ALIAS DE COMPATIBILIDAD ----------
-          // /compras/nueva  y  /compras/nuevo
-         // { path: "nueva", element: <CompraNuevaPage /> },
-          //{ path: "nuevo", element: <CompraNuevaPage /> },
+          // { path: "nueva", element: <CompraNuevaPage /> },
+          // { path: "nuevo", element: <CompraNuevaPage /> },
 
           // /compras/:id  (detalle)
           { path: ":id", element: <CompraDetallePage /> },
@@ -171,6 +165,28 @@ export const router = createBrowserRouter([
           { path: ":id/recepciones/nueva", element: <RecepcionNuevaPage /> },
         ],
       },
+
+      // === Ventas (ANIDADO CON LAYOUT) — aquí viven Cobros y Anticipos
+      {
+        path: "/ventas",
+        element: <VentasLayout />,
+        children: [
+          { index: true, element: <VentasListado /> },            // /ventas
+          { path: "nueva", element: <VentaNueva /> },             // /ventas/nueva
+          // { path: ":id", element: <VentaDetalle /> },
+          // { path: ":id/trazabilidad", element: <VentaTrazabilidad /> },
+
+          // Cobros (CxC)
+          { path: "cobros", element: <CxcListado /> },            // /ventas/cobros
+
+          // Anticipos
+          { path: "anticipos", element: <AnticiposListado /> },   // /ventas/anticipos
+          { path: "anticipos/nuevo", element: <AnticipoCrearForm /> }, // /ventas/anticipos/nuevo
+          { path: "anticipos/:id", element: <AnticipoDetalle /> },     // /ventas/anticipos/:id
+        ],
+      },
+
+      // Seguridad
       {
         path: "/seguridad",
         element: <SeguridadLayout />,
@@ -183,11 +199,6 @@ export const router = createBrowserRouter([
         ],
       },
 
-
-
-
-
-
       // Inventario
       { path: "/inventario/por-lote", element: <InventarioPorLotePage /> },
       // { path: "/inventario/productos", element: <ProductosPage /> },
@@ -197,44 +208,15 @@ export const router = createBrowserRouter([
       { path: "/sucursales/nueva", element: <NuevaSucursal /> },
       { path: "/sucursales/:id", element: <EditarSucursal /> },
 
-      // Catálogo interno
-      //{ path: "/catalogo/almacenes", element: <AlmacenesPage /> },
-      // { path: "/catalogo/categorias", element: <CategoriasPage /> },
-      // { path: "/catalogo/monedas", element: <MonedasPage /> },
-      // { path: "/catalogo/unidades", element: <UnidadesPage /> },
-      // { path: "/catalogo/presentaciones", element: <PresentacionesPage /> },
-
-      // Compras
-      // { path: "/compras", element: <ComprasListaPage /> },
-      //  { path: "/compras/nueva", element: <CompraNuevaPage /> },
-      //  { path: "/compras/:id", element: <CompraDetallePage /> },
-      //  { path: "/compras/:id/recepciones/nueva", element: <RecepcionNuevaPage /> },
-
-      // Ventas
-      { path: "/ventas", element: <VentasListado /> },
-      { path: "/ventas/nueva", element: <VentaNueva /> },
-  //    { path: "/ventas/:id", element: <VentaDetalle /> },
-  //    { path: "/ventas/:id/trazabilidad", element: <VentaTrazabilidad /> }, // opcional
-
-      // Anticipos
-      { path: "/anticipos", element: <AnticiposListado /> },
-      { path: "/anticipos/nuevo", element: <AnticipoCrearForm /> },
-      { path: "/anticipos/:id", element: <AnticipoDetalle /> },
-     // { path: "/anticipos/:id/aplicar", element: <AplicarAnticipoModal  /> },
-
-      // Cobros (cuentas por cobrar)
-      { path: "/cobros", element: <CxcListado /> },
-      //{ path: "/cobros/:id/aplicar", element: <AplicarPagoModal /> },
+      // ===== Aliases de compatibilidad (redirigen al módulo Ventas) =====
+      { path: "/cobros", element: <Navigate to="/ventas/cobros" replace /> },
+      { path: "/anticipos", element: <Navigate to="/ventas/anticipos" replace /> },
+      { path: "/anticipos/nuevo", element: <Navigate to="/ventas/anticipos/nuevo" replace /> },
+      { path: "/anticipos/:id", element: <Navigate to="/ventas/anticipos/:id" replace /> },
 
       // CRM básico
       { path: "/clientes", element: <ClientesPage /> },
       // { path: "/proveedores", element: <ProveedoresPage /> },
-
-      // Seguridad
-     // { path: "/seguridad", element: <Navigate to="/seguridad/usuarios" replace /> },
-     // { path: "/seguridad/usuarios", element: <UsuariosPage /> },
-     // { path: "/seguridad/roles", element: <RolesPage /> },
-     // { path: "/seguridad/permisos", element: <PermisosPage /> },
     ],
   },
 
