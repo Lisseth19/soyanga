@@ -64,8 +64,8 @@ function renderRolesChip(n?: number | string) {
     if (n === 0) return <span className="text-neutral-600">-</span>;
     return (
         <span className="inline-flex items-center px-2 py-0.5 rounded bg-sky-50 text-sky-700 text-xs font-medium">
-      {typeof n === "number" ? `${n} rol${n === 1 ? "" : "es"}` : n ?? "…"}
-    </span>
+            {typeof n === "number" ? `${n} rol${n === 1 ? "" : "es"}` : n ?? "…"}
+        </span>
     );
 }
 
@@ -186,7 +186,7 @@ export default function UsuariosPage() {
                     </label>
 
                     {can("usuarios:crear") && (
-                        <button className="bg-black text-white px-3 py-2 rounded" onClick={() => setMostrarForm({ modo: "crear" })}>
+                        <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg shadow-sm" onClick={() => setMostrarForm({ modo: "crear" })}>
                             + Nuevo usuario
                         </button>
                     )}
@@ -201,128 +201,127 @@ export default function UsuariosPage() {
                 <div className="border rounded overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50">
-                        <tr>
-                            <th className="text-left p-2">Usuario</th>
-                            <th className="text-left p-2">Nombre</th>
-                            <th className="text-left p-2">Email</th>
-                            <th className="text-left p-2">Roles</th>
-                            <th className="text-left p-2">Estado</th>
-                            <th className="text-right p-2">Acciones</th>
-                        </tr>
+                            <tr>
+                                <th className="text-left p-2">Usuario</th>
+                                <th className="text-left p-2">Nombre</th>
+                                <th className="text-left p-2">Email</th>
+                                <th className="text-left p-2">Roles</th>
+                                <th className="text-left p-2">Estado</th>
+                                <th className="text-right p-2">Acciones</th>
+                            </tr>
                         </thead>
                         <tbody>
-                        {rows.map((u, idx) => {
-                            const count = roleCounts[u.id!] ?? (Array.isArray(u.roles) ? u.roles.length : undefined);
-                            const nombres = roleNames[u.id!] ?? [];
-                            const chip = count === undefined ? (hydratingCounts ? "…" : "…") : count;
+                            {rows.map((u, idx) => {
+                                const count = roleCounts[u.id!] ?? (Array.isArray(u.roles) ? u.roles.length : undefined);
+                                const nombres = roleNames[u.id!] ?? [];
+                                const chip = count === undefined ? (hydratingCounts ? "…" : "…") : count;
 
-                            return (
-                                <tr key={u.id || u.username || idx} className="border-t">
-                                    <td className="p-2">{u.username}</td>
-                                    <td className="p-2">{u.nombreCompleto}</td>
-                                    <td className="p-2">{u.email}</td>
-                                    <td className="p-2">
-                                        <button
-                                            type="button"
-                                            className="hover:opacity-80"
-                                            onClick={() => setMostrarRolesVer({ usuario: u, nombres })}
-                                            title="Ver roles asignados"
-                                        >
-                                            {renderRolesChip(chip)}
-                                        </button>
-                                    </td>
-                                    <td className="p-2">
-                      <span
-                          className={`px-2 py-1 rounded text-xs ${
-                              u.activo ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-700"
-                          }`}
-                      >
-                        {u.activo ? "Activo" : "Inactivo"}
-                      </span>
-                                    </td>
-                                    <td className="p-2 text-right">
-                                        <div className="inline-flex gap-2">
-                                            {can("usuarios:actualizar") && (
-                                                <button className="underline" onClick={() => setMostrarForm({ modo: "editar", usuario: u })}>
-                                                    Editar
-                                                </button>
-                                            )}
+                                return (
+                                    <tr key={u.id || u.username || idx} className="border-t">
+                                        <td className="p-2">{u.username}</td>
+                                        <td className="p-2">{u.nombreCompleto}</td>
+                                        <td className="p-2">{u.email}</td>
+                                        <td className="p-2">
+                                            <button
+                                                type="button"
+                                                className="hover:opacity-80"
+                                                onClick={() => setMostrarRolesVer({ usuario: u, nombres })}
+                                                title="Ver roles asignados"
+                                            >
+                                                {renderRolesChip(chip)}
+                                            </button>
+                                        </td>
+                                        <td className="p-2">
+                                            <span
+                                                className={`px-2 py-1 rounded text-xs ${u.activo ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-700"
+                                                    }`}
+                                            >
+                                                {u.activo ? "Activo" : "Inactivo"}
+                                            </span>
+                                        </td>
+                                        <td className="p-2 text-right">
+                                            <div className="inline-flex gap-2">
+                                                {can("usuarios:actualizar") && (
+                                                    <button className="underline" onClick={() => setMostrarForm({ modo: "editar", usuario: u })}>
+                                                        Editar
+                                                    </button>
+                                                )}
 
-                                            {can("usuarios:actualizar") && (
-                                                <button
-                                                    className="underline"
-                                                    onClick={async () => {
-                                                        try {
-                                                            const detalle: any = await UsuarioService.obtener(u.id);
-                                                            const actuales = normalizeRolesList(
-                                                                detalle?.roles ?? detalle?.authorities ?? detalle?.perfiles ?? detalle?.rolesNombres ?? []
-                                                            );
-                                                            setRoleCounts((m) => ({ ...m, [u.id!]: actuales.length }));
-                                                            setRoleNames((m) => ({ ...m, [u.id!]: actuales.map((r) => r.nombre) }));
-                                                            setMostrarRoles(u);
-                                                        } catch {
-                                                            setMostrarRoles(u);
-                                                        }
-                                                    }}
-                                                    title="Asignar/Quitar roles"
-                                                >
-                                                    Asignar roles
-                                                </button>
-                                            )}
+                                                {can("usuarios:actualizar") && (
+                                                    <button
+                                                        className="underline"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const detalle: any = await UsuarioService.obtener(u.id);
+                                                                const actuales = normalizeRolesList(
+                                                                    detalle?.roles ?? detalle?.authorities ?? detalle?.perfiles ?? detalle?.rolesNombres ?? []
+                                                                );
+                                                                setRoleCounts((m) => ({ ...m, [u.id!]: actuales.length }));
+                                                                setRoleNames((m) => ({ ...m, [u.id!]: actuales.map((r) => r.nombre) }));
+                                                                setMostrarRoles(u);
+                                                            } catch {
+                                                                setMostrarRoles(u);
+                                                            }
+                                                        }}
+                                                        title="Asignar/Quitar roles"
+                                                    >
+                                                        Asignar roles
+                                                    </button>
+                                                )}
 
-                                            {can("usuarios:actualizar") && (
-                                                <button className="underline" onClick={() => setMostrarPwd(u)}>
-                                                    Password
-                                                </button>
-                                            )}
+                                                {can("usuarios:actualizar") && (
+                                                    <button className="underline" onClick={() => setMostrarPwd(u)}>
+                                                        Password
+                                                    </button>
+                                                )}
 
-                                            {can("usuarios:actualizar") && (
-                                                <button
-                                                    className="underline"
-                                                    title={u.activo ? "Desactivar" : "Activar"}
-                                                    onClick={async () => {
-                                                        try {
-                                                            await UsuarioService.cambiarEstado(u.id, !u.activo);
-                                                            await cargar();
-                                                        } catch (e: any) {
-                                                            if (e?.status === 403) return show403();
-                                                            alert(await parseError(e));
-                                                        }
-                                                    }}
-                                                >
-                                                    {u.activo ? "Desactivar" : "Activar"}
-                                                </button>
-                                            )}
+                                                {can("usuarios:actualizar") && (
+                                                    <button
+                                                        className="underline"
+                                                        title={u.activo ? "Desactivar" : "Activar"}
+                                                        onClick={async () => {
+                                                            try {
+                                                                await UsuarioService.cambiarEstado(u.id, !u.activo);
+                                                                await cargar();
+                                                            } catch (e: any) {
+                                                                if (e?.status === 403) return show403();
+                                                                alert(await parseError(e));
+                                                            }
+                                                        }}
+                                                    >
+                                                        {u.activo ? "Desactivar" : "Activar"}
+                                                    </button>
+                                                )}
 
-                                            {can("usuarios:eliminar") && (
-                                                <button
-                                                    className="text-red-600 underline"
-                                                    onClick={async () => {
-                                                        if (!confirm("¿Eliminar usuario?")) return;
-                                                        try {
-                                                            await UsuarioService.eliminar(u.id);
-                                                            await cargar();
-                                                        } catch (e: any) {
-                                                            if (e?.status === 403) return show403();
-                                                            alert(await parseError(e));
-                                                        }
-                                                    }}
-                                                >
-                                                    Eliminar
-                                                </button>
-                                            )}
-                                        </div>
+                                                {can("usuarios:eliminar") && (
+                                                    <button
+                                                        className="text-red-600 underline"
+                                                        onClick={async () => {
+                                                            if (!confirm("¿Eliminar usuario?")) return;
+                                                            try {
+                                                                await UsuarioService.eliminar(u.id);
+                                                                await cargar();
+                                                            } catch (e: any) {
+                                                                if (e?.status === 403) return show403();
+                                                                alert(await parseError(e));
+                                                            }
+                                                        }}
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {rows.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} className="p-6 text-center text-gray-500">
+                                        Sin resultados
                                     </td>
                                 </tr>
-                            );
-                        })}
-                        {rows.length === 0 && (
-                            <tr>
-                                <td colSpan={6} className="p-6 text-center text-gray-500">
-                                    Sin resultados
-                                </td>
-                            </tr>
-                        )}
+                            )}
                         </tbody>
                     </table>
 
@@ -402,13 +401,13 @@ export default function UsuariosPage() {
 /* ---------------- Modales ---------------- */
 
 function UsuarioFormModal({
-                              modo,
-                              usuario,
-                              onClose,
-                              onSaved,
-                              canCrear,
-                              canActualizar,
-                          }: {
+    modo,
+    usuario,
+    onClose,
+    onSaved,
+    canCrear,
+    canActualizar,
+}: {
     modo: "crear" | "editar";
     usuario?: UsuarioDTO;
     onClose: () => void;
@@ -478,9 +477,15 @@ function UsuarioFormModal({
     }
 
     return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+        <div
+            className="fixed inset-0 z-[60] bg-black/50 flex items-start md:items-center justify-center p-4"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+        >
+
             <form
-                className="bg-white w-full max-w-lg rounded-xl p-6 space-y-3"
+                className="bg-white w-full max-w-lg rounded-2xl p-6 space-y-3 shadow-xl border border-neutral-200 max-h-[85vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
                 onSubmit={onSubmit}
             >
@@ -548,14 +553,23 @@ function UsuarioFormModal({
 
                 {err && <div className="text-red-600 text-sm whitespace-pre-wrap">{err}</div>}
                 <div className="flex items-center justify-end gap-2 pt-2">
-                    <button type="button" className="px-3 py-2 border rounded" onClick={onClose}>
+                    <button
+                        type="button"
+                        className="px-3 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50"
+                        onClick={onClose}
+                    >
                         Cancelar
                     </button>
                     {(!isEdit || canActualizar) && (
-                        <button type="submit" className="px-3 py-2 bg-black text-white rounded" disabled={saving}>
+                        <button
+                            type="submit"
+                            className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+                            disabled={saving}
+                        >
                             {isEdit ? "Guardar" : "Crear"}
                         </button>
                     )}
+
                 </div>
             </form>
         </div>
@@ -563,10 +577,10 @@ function UsuarioFormModal({
 }
 
 function PasswordModal({
-                           usuario,
-                           onClose,
-                           onSaved,
-                       }: {
+    usuario,
+    onClose,
+    onSaved,
+}: {
     usuario: UsuarioDTO;
     onClose: () => void;
     onSaved: () => void;
@@ -599,8 +613,15 @@ function PasswordModal({
     }
 
     return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-            <form className="bg-white w-full max-w-md rounded-xl p-6 space-y-3" onClick={(e) => e.stopPropagation()} onSubmit={onSubmit}>
+        <div
+            className="fixed inset-0 z-[60] bg-black/50 flex items-start md:items-center justify-center p-4"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+        >
+
+            <form className="bg-white w-full max-w-md rounded-2xl p-6 space-y-3 shadow-xl border border-neutral-200 max-h-[85vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()} onSubmit={onSubmit}>
                 <h3 className="text-lg font-semibold">Cambiar contraseña — {usuario.username}</h3>
                 <input
                     type="password"
@@ -619,10 +640,10 @@ function PasswordModal({
                 />
                 {err && <div className="text-red-600 text-sm whitespace-pre-wrap">{err}</div>}
                 <div className="flex items-center justify-end gap-2 pt-2">
-                    <button type="button" className="px-3 py-2 border rounded" onClick={onClose}>
+                    <button type="button" className="px-3 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50" onClick={onClose}>
                         Cancelar
                     </button>
-                    <button type="submit" className="px-3 py-2 bg-black text-white rounded" disabled={saving}>
+                    <button type="submit" className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white" disabled={saving}>
                         Actualizar
                     </button>
                 </div>
@@ -633,10 +654,10 @@ function PasswordModal({
 
 /** Modal EDITABLE (asignar/quitar) */
 function RolesModal({
-                        usuario,
-                        onClose,
-                        onSaved,
-                    }: {
+    usuario,
+    onClose,
+    onSaved,
+}: {
     usuario: UsuarioDTO;
     onClose: () => void;
     onSaved: () => void;
@@ -739,18 +760,24 @@ function RolesModal({
 
 /** Modal SOLO LECTURA para ver nombres (al click en el chip) */
 function RolesVerModal({
-                           usuario,
-                           nombres,
-                           onClose,
-                       }: {
+    usuario,
+    nombres,
+    onClose,
+}: {
     usuario: UsuarioDTO;
     nombres: string[];
     onClose: () => void;
 }) {
     const list = Array.isArray(nombres) ? nombres : [];
     return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-md rounded-xl p-6 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div
+            className="fixed inset-0 z-[60] bg-black/50 flex items-start md:items-center justify-center p-4"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+        >
+
+            <div className="bg-white w-full max-w-md rounded-2xl p-6 space-y-3 shadow-xl border border-neutral-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 <h3 className="text-lg font-semibold">Roles de {usuario.username}</h3>
                 {list.length === 0 ? (
                     <div className="text-sm text-gray-500">Este usuario no tiene roles.</div>
@@ -762,9 +789,10 @@ function RolesVerModal({
                     </ul>
                 )}
                 <div className="flex items-center justify-end pt-2">
-                    <button className="px-3 py-2 border rounded" onClick={onClose}>
+                    <button className="px-3 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50" onClick={onClose}>
                         Cerrar
                     </button>
+
                 </div>
             </div>
         </div>

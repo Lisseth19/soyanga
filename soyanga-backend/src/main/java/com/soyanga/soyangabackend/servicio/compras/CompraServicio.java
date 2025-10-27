@@ -9,7 +9,9 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
@@ -194,4 +196,25 @@ public class CompraServicio {
                 .fechaEstimadaRecepcion(d.getFechaEstimadaRecepcion())
                 .build();
     }
+
+    @Transactional
+    public void eliminarSiVacia(Long id) {
+        var compra = compraRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compra no encontrada"));
+
+        // enum -> se compara con ==, no con equalsIgnoreCase
+        boolean pendiente = (compra.getEstadoCompra() == Compra.EstadoCompra.pendiente);
+
+        // usa el método correcto del repositorio
+        boolean sinItems = (detalleRepo.countByIdCompra(id) == 0);
+
+        if (!(pendiente && sinItems)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Sólo se puede eliminar una compra PENDIENTE y sin ítems");
+        }
+
+        compraRepo.deleteById(id);
+    }
+
 }

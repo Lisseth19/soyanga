@@ -12,4 +12,8 @@ public interface CompraDetalleRepositorio extends BaseRepository<CompraDetalle, 
     // CompraDetalleRepositorio.java
     Optional<CompraDetalle> findByIdCompraAndIdPresentacion(Long idCompra, Long idPresentacion);
 
+    boolean existsByIdCompra(Long IdCompra);
+
+    long countByIdCompra(Long idCompra);
+
 }
