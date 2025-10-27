@@ -66,6 +66,10 @@ public class Venta {
     @Column(name = "condicion_de_pago", nullable = false, length = 20)
     private CondicionPago condicionDePago;
 
+    @Column(name = "interes_credito", precision = 5, scale = 2)
+    private BigDecimal interesCredito;
+
+
     @Column(name = "fecha_vencimiento_credito")
     private LocalDate fechaVencimientoCredito;
 

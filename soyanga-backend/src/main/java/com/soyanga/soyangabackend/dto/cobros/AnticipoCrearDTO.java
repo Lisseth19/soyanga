@@ -16,4 +16,5 @@ public class AnticipoCrearDTO {
     private BigDecimal montoBob;
 
     private String observaciones;
+
 }

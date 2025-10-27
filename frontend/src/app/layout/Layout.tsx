@@ -282,6 +282,24 @@ export default function AppLayout() {
                     </NavLink>
                 )}
 
+                {can("ventas:ver") && (
+                    <NavLink to="/ventas" className={navClass}>
+                      Ventas
+                    </NavLink>
+                )}
+
+                {can("anticipos:ver") && (
+                    <NavLink to="/anticipos" className={navClass}>
+                      Anticipos
+                    </NavLink>
+                )}
+
+                {can("cobros:ver") && (
+                    <NavLink to="/cobros" className={navClass}>
+                      Cobros
+                    </NavLink>
+                )}
+
                 {(can("usuarios:ver") || can("roles:ver") || can("permisos:ver")) && (
                     <>
                       {can("usuarios:ver") && (

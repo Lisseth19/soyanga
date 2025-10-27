@@ -36,6 +36,18 @@ import CompraDetallePage from "@/paginas/compras/CompraDetalle";
 import CompraNuevaPage from "@/paginas/compras/CompraNueva";
 import RecepcionNuevaPage from "@/paginas/compras/RecepcionNueva";
 
+// Ventas
+import VentasListado from "@/paginas/ventas/VentasListado";
+import VentaNueva from "@/paginas/ventas/VentaNueva";
+//import VentaDetalle from "@/paginas/ventas/VentaDetalle";
+//import VentaTrazabilidad from "@/paginas/ventas/VentaTrazabilidad"; // si aún no la tienes, coméntala
+
+//Anticipos
+import AnticiposListado from "@/paginas/anticipos/AnticiposListado";
+import AnticipoDetalle from "@/paginas/anticipos/AnticipoDetalle";
+//import { AplicarAnticipoModal } from "@/paginas/anticipos/AplicarAnticipoModal";
+import { AnticipoCrearForm } from "@/paginas/anticipos/AnticipoCrearForm";
+
 // CRM básico
 import ClientesPage from "@/paginas/cliente/Clientes";
 import ProveedoresPage from "@/paginas/proveedor/Proveedores";
@@ -44,6 +56,11 @@ import ProveedoresPage from "@/paginas/proveedor/Proveedores";
 import UsuariosPage from "@/paginas/seguridad/Usuarios";
 import RolesPage from "@/paginas/seguridad/Roles";
 import PermisosPage from "@/paginas/seguridad/Permisos";
+
+//CxC
+//import {AplicarPagoModal} from "@/paginas/cobros/AplicarPagoModal.tsx";
+import CxcListado from "@/paginas/cobros/CxcListado.tsx";
+
 
 export const router = createBrowserRouter([
   // ============================
@@ -100,6 +117,22 @@ export const router = createBrowserRouter([
       { path: "/compras/nueva", element: <CompraNuevaPage /> },
       { path: "/compras/:id", element: <CompraDetallePage /> },
       { path: "/compras/:id/recepciones/nueva", element: <RecepcionNuevaPage /> },
+
+      // Ventas
+      { path: "/ventas", element: <VentasListado /> },
+      { path: "/ventas/nueva", element: <VentaNueva /> },
+  //    { path: "/ventas/:id", element: <VentaDetalle /> },
+  //    { path: "/ventas/:id/trazabilidad", element: <VentaTrazabilidad /> }, // opcional
+
+      // Anticipos
+      { path: "/anticipos", element: <AnticiposListado /> },
+      { path: "/anticipos/nuevo", element: <AnticipoCrearForm /> },
+      { path: "/anticipos/:id", element: <AnticipoDetalle /> },
+     // { path: "/anticipos/:id/aplicar", element: <AplicarAnticipoModal  /> },
+
+      // Cobros (cuentas por cobrar)
+      { path: "/cobros", element: <CxcListado /> },
+      //{ path: "/cobros/:id/aplicar", element: <AplicarPagoModal /> },
 
       // CRM básico
       { path: "/clientes", element: <ClientesPage /> },

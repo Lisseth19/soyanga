@@ -8,13 +8,16 @@ import com.soyanga.soyangabackend.repositorio.cobros.AplicacionPagoRepositorio;
 import com.soyanga.soyangabackend.repositorio.cobros.CuentaPorCobrarRepositorio;
 import com.soyanga.soyangabackend.repositorio.inventario.ExistenciaLoteRepositorio;
 import com.soyanga.soyangabackend.repositorio.inventario.MovimientoInventarioRepositorio;
+import com.soyanga.soyangabackend.repositorio.precios.ImpuestoRepositorio;
 import com.soyanga.soyangabackend.repositorio.ventas.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.soyanga.soyangabackend.dominio.CuentaPorCobrar.EstadoCuenta;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,30 +36,38 @@ public class VentaServicio {
     private final MovimientoInventarioRepositorio movRepo;
     private final PresentacionProductoRepositorio presentacionRepo;
 
+    private final ImpuestoRepositorio impuestoRepo;
+
     @Transactional
     public VentaRespuestaDTO crear(VentaCrearDTO dto) {
+
+        // ===== Validaciones previas =====
         if ("credito".equalsIgnoreCase(dto.getCondicionDePago()) &&
                 dto.getFechaVencimientoCredito() == null) {
             throw new IllegalArgumentException("Para ventas a crédito, fechaVencimientoCredito es obligatoria");
         }
+        // Cliente obligatorio para FACTURA
+        if ("factura".equalsIgnoreCase(dto.getTipoDocumentoTributario()) &&
+                dto.getIdCliente() == null) {
+            throw new IllegalArgumentException("Para FACTURA, el cliente es obligatorio");
+        }
 
         var fecha = dto.getFechaVenta() != null ? dto.getFechaVenta() : LocalDateTime.now();
 
-        // convierte strings del DTO → enums de la entidad
         var tipoDoc = parseEnumLower(Venta.TipoDocumentoTributario.class,
-                dto.getTipoDocumentoTributario(),
-                "tipoDocumentoTributario");
+                dto.getTipoDocumentoTributario(),"tipoDocumentoTributario");
 
-        // metodoDePago: si viene null, usa efectivo como default
         var metodo = dto.getMetodoDePago() != null
                 ? parseEnumLower(Venta.MetodoDePago.class, dto.getMetodoDePago(), "metodoDePago")
                 : Venta.MetodoDePago.efectivo;
 
-        var condicion = parseEnumLower(Venta.CondicionPago.class,
-                dto.getCondicionDePago(),
-                "condicionDePago");
+        var condicion = parseEnumLower(Venta.CondicionPago.class, dto.getCondicionDePago(),"condicionDePago");
 
         var estado = Venta.EstadoVenta.confirmada;
+
+        // Interés (PORCENTAJE, opcional). Ej: 5 = 5%
+        BigDecimal interesCreditoPct = dto.getInteresCredito() != null ? dto.getInteresCredito() : BigDecimal.ZERO;
+        if (interesCreditoPct.signum() < 0) interesCreditoPct = BigDecimal.ZERO;
 
         var venta = Venta.builder()
                 .fechaVenta(fecha)
@@ -69,6 +80,7 @@ public class VentaServicio {
                 .totalNetoBob(BigDecimal.ZERO)
                 .metodoDePago(metodo)
                 .condicionDePago(condicion)
+                .interesCredito(interesCreditoPct) // se guarda el PORCENTAJE
                 .fechaVencimientoCredito(dto.getFechaVencimientoCredito())
                 .idAlmacenDespacho(dto.getIdAlmacenDespacho())
                 .estadoVenta(estado)
@@ -80,7 +92,7 @@ public class VentaServicio {
         BigDecimal totalBruto = BigDecimal.ZERO;
         BigDecimal totalDesc = BigDecimal.ZERO;
 
-        // 2) Recorrer items
+        // ===== Recorrer items =====
         for (var it : dto.getItems()) {
             var present = presentacionRepo.findById(it.getIdPresentacion())
                     .orElseThrow(() -> new IllegalArgumentException("Presentación no encontrada: " + it.getIdPresentacion()));
@@ -91,7 +103,6 @@ public class VentaServicio {
             BigDecimal descPct = it.getDescuentoPorcentaje() != null ? it.getDescuentoPorcentaje() : BigDecimal.ZERO;
             BigDecimal descMonto = it.getDescuentoMontoBob() != null ? it.getDescuentoMontoBob() : BigDecimal.ZERO;
 
-            // 2.1 Detalle base (sin lotes todavía)
             var det = VentaDetalle.builder()
                     .idVenta(venta.getIdVenta())
                     .idPresentacion(it.getIdPresentacion())
@@ -99,20 +110,16 @@ public class VentaServicio {
                     .precioUnitarioBob(precioUnit)
                     .descuentoPorcentaje(descPct)
                     .descuentoMontoBob(descMonto)
-                    .subtotalBob(BigDecimal.ZERO) // lo calculamos después de asignar lotes
+                    .subtotalBob(BigDecimal.ZERO)
                     .build();
             det = ventaDetRepo.save(det);
 
-            // 2.2 Asignación FEFO por existencias
             BigDecimal porDespachar = it.getCantidad();
-
-            // lista FEFO (limite alto por seguridad)
             var existencias = existenciaRepo.pickFefo(dto.getIdAlmacenDespacho(), it.getIdPresentacion(), 500);
 
             for (var ex : existencias) {
                 if (porDespachar.compareTo(BigDecimal.ZERO) <= 0) break;
 
-                // bloquea la fila para actualización segura
                 var exLock = existenciaRepo.lockByAlmacenAndIdLote(ex.getIdAlmacen(), ex.getIdLote())
                         .orElseThrow(() -> new IllegalStateException("Existencia desapareció durante la venta"));
 
@@ -121,12 +128,10 @@ public class VentaServicio {
                 var mover = exLock.getCantidadDisponible().min(porDespachar);
                 if (mover.compareTo(BigDecimal.ZERO) <= 0) continue;
 
-                // resta stock
                 exLock.setCantidadDisponible(exLock.getCantidadDisponible().subtract(mover));
                 exLock.setFechaUltimaActualizacion(LocalDateTime.now());
                 existenciaRepo.save(exLock);
 
-                // registrar detalle por lote
                 var detLote = VentaDetalleLote.builder()
                         .idVentaDetalle(det.getIdVentaDetalle())
                         .idLote(exLock.getIdLote())
@@ -134,7 +139,6 @@ public class VentaServicio {
                         .build();
                 ventaDetLoteRepo.save(detLote);
 
-                // movimiento de salida
                 var mov = MovimientoInventario.builder()
                         .fechaMovimiento(LocalDateTime.now())
                         .tipoMovimiento(MovimientoInventario.TipoMovimiento.salida_venta)
@@ -147,21 +151,19 @@ public class VentaServicio {
                         .build();
                 movRepo.save(mov);
 
-                // subtotal por esta porción
                 BigDecimal brutoParte = mover.multiply(precioUnit);
                 BigDecimal descPartePct = brutoParte.multiply(descPct).divide(new BigDecimal("100"));
-                BigDecimal descParte = descPartePct.add(descMonto.min(brutoParte)); // aplica fijo topeado
+                BigDecimal descParte = descPartePct.add(descMonto.min(brutoParte));
                 BigDecimal netoParte = brutoParte.subtract(descParte);
 
                 det.setSubtotalBob(det.getSubtotalBob().add(netoParte));
 
-                // para respuesta (opcional)
                 asignaciones.add(VentaRespuestaDTO.ItemAsignado.builder()
                         .idPresentacion(it.getIdPresentacion())
                         .sku(present.getCodigoSku())
-                        .producto(null) // si quieres, puedes traer nombre desde una proyección
+                        .producto(null)
                         .numeroLote("L" + exLock.getIdLote())
-                        .vencimiento(null) // si necesitas, puedes selectear desde lotes
+                        .vencimiento(null)
                         .cantidad(mover)
                         .precioUnitarioBob(precioUnit)
                         .subtotalBob(netoParte)
@@ -176,8 +178,8 @@ public class VentaServicio {
             }
 
             ventaDetRepo.save(det);
+
             totalBruto = totalBruto.add(it.getCantidad().multiply(precioUnit));
-            // aproximación: sumamos descuentos del detalle (podrías recalcular exacto con asientos por porción)
             BigDecimal descDet = it.getCantidad().multiply(precioUnit).multiply(descPct).divide(new BigDecimal("100"))
                     .add(descMonto);
             totalDesc = totalDesc.add(descDet);
@@ -186,18 +188,37 @@ public class VentaServicio {
         BigDecimal totalNeto = totalBruto.subtract(totalDesc);
         if (totalNeto.compareTo(BigDecimal.ZERO) < 0) totalNeto = BigDecimal.ZERO;
 
+        // ===== IMPUESTO si FACTURA =====
+        BigDecimal impuestoPct = BigDecimal.ZERO;
+        BigDecimal impuestoMonto = BigDecimal.ZERO;
+
+        if (venta.getTipoDocumentoTributario() == Venta.TipoDocumentoTributario.factura) {
+            impuestoPct = resolverImpuestoPct(dto.getImpuestoId());
+            if (impuestoPct.signum() > 0) {
+                impuestoMonto = totalNeto.multiply(impuestoPct).divide(new BigDecimal("100"));
+                totalNeto = totalNeto.add(impuestoMonto);
+            }
+        }
+
+        // ===== Guardar totales =====
         venta.setTotalBrutoBob(totalBruto);
         venta.setDescuentoTotalBob(totalDesc);
         venta.setTotalNetoBob(totalNeto);
         ventaRepo.save(venta);
 
-        // 3) Si es crédito, generar CxC
-        if (condicion == Venta.CondicionPago.credito) {
+        // ===== CxC si CRÉDITO: interés como PORCENTAJE =====
+        if (venta.getCondicionDePago() == Venta.CondicionPago.credito) {
+            // interesCreditoPct es el % (ej. 5 = 5%)
+            BigDecimal factorInteres = BigDecimal.ONE.add(
+                    interesCreditoPct.divide(new BigDecimal("100"), 6, RoundingMode.HALF_UP)
+            );
+            BigDecimal montoPendiente = totalNeto.multiply(factorInteres).setScale(2, RoundingMode.HALF_UP);
+
             var cxc = CuentaPorCobrar.builder()
                     .idVenta(venta.getIdVenta())
-                    .montoPendienteBob(totalNeto)
+                    .montoPendienteBob(montoPendiente)
                     .fechaEmision(LocalDate.now())
-                    .fechaVencimiento(dto.getFechaVencimientoCredito())
+                    .fechaVencimiento(dto.getFechaVencimientoCredito()) // puede ser 1..N meses
                     .estadoCuenta(EstadoCuenta.pendiente)
                     .build();
             cxcRepo.save(cxc);
@@ -207,10 +228,15 @@ public class VentaServicio {
                 .idVenta(venta.getIdVenta())
                 .totalBrutoBob(totalBruto)
                 .descuentoTotalBob(totalDesc)
-                .totalNetoBob(totalNeto)
+                .totalNetoBob(totalNeto)       // incluye impuesto si factura
+                .impuestoPorcentaje(impuestoPct)
+                .impuestoMontoBob(impuestoMonto)
+                .interesCredito(interesCreditoPct) // porcentaje reportado en la respuesta
                 .asignaciones(asignaciones)
                 .build();
     }
+
+    //------------------------------------------------------------------------------------------------------
     private static <E extends Enum<E>> E parseEnumLower(Class<E> enumType, String value, String campo) {
         if (value == null) {
             throw new IllegalArgumentException("El campo " + campo + " es requerido");
@@ -221,6 +247,7 @@ public class VentaServicio {
             throw new IllegalArgumentException("Valor inválido para " + campo + ": " + value);
         }
     }
+
     @Transactional
     public void anular(Long idVenta, String motivo) {
         var venta = ventaRepo.findById(idVenta)
@@ -280,5 +307,26 @@ public class VentaServicio {
         // Marcar venta como anulada
         venta.setEstadoVenta(Venta.EstadoVenta.anulada);
         ventaRepo.save(venta);
+    }
+
+    // ===== Impuesto helper =====
+    private BigDecimal resolverImpuestoPct(Long impuestoId) {
+        // 1) si enviaron un id explícito
+        if (impuestoId != null) {
+            var imp = impuestoRepo.findById(impuestoId)
+                    .orElseThrow(() -> new IllegalArgumentException("Impuesto no encontrado: " + impuestoId));
+            if (Boolean.FALSE.equals(imp.getEstadoActivo())) {
+                throw new IllegalArgumentException("El impuesto seleccionado no está activo");
+            }
+            return imp.getPorcentaje() != null ? imp.getPorcentaje() : BigDecimal.ZERO;
+        }
+
+        // 2) si NO enviaron id: toma 1 activo (el primero por nombre)
+        var page = impuestoRepo.listar(null, true, PageRequest.of(0, 1)); // q=null, soloActivos=true
+        if (page.isEmpty()) {
+            throw new IllegalStateException("No hay impuestos activos configurados");
+        }
+        var p = page.getContent().get(0);
+        return p.getPorcentaje() != null ? p.getPorcentaje() : BigDecimal.ZERO;
     }
 }
