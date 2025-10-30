@@ -24,6 +24,7 @@ public class VentaDetalleDTO {
 
     private String metodoDePago;
     private String condicionDePago;
+ //   private BigDecimal interesCredito;
     private LocalDate fechaVencimientoCredito;
 
     private Long idAlmacenDespacho;

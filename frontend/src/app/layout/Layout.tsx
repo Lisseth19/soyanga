@@ -24,11 +24,13 @@ export default function AppLayout() {
 
   // 👉 pantallas con layout de módulo (sidebar): full-bleed
   const isSettings =
+
     pathname.startsWith("/catalogo") ||
     pathname.startsWith("/config") ||
     pathname.startsWith("/compras") ||
     pathname.startsWith("/seguridad") ||
     pathname.startsWith("/inventario");
+    pathname.startsWith("/ventas");
 
   /* ================== Scroll del menú superior ================== */
   const navRef = useRef<HTMLDivElement>(null);
@@ -60,6 +62,7 @@ export default function AppLayout() {
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
+      // convierte scroll vertical del mouse en scroll horizontal del carrusel
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
         e.preventDefault();
         el.scrollLeft += e.deltaY * 0.35;
@@ -70,6 +73,11 @@ export default function AppLayout() {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel as any);
   }, []);
+
+  // Recalcular cuando cambie la ruta (por ancho/activo)
+  useEffect(() => {
+    updateEdges();
+  }, [pathname]);
 
   // Drag-to-scroll
   const onMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
@@ -156,91 +164,93 @@ export default function AppLayout() {
 
   // Permisos por módulo
   const canConfigCatalog =
-    can("sucursales:ver") ||
-    can("almacenes:ver") ||
-    can("monedas:ver") ||
-    can("tipos-cambio:ver") ||
-    can("categorias:ver") ||
-    can("productos:ver") ||
-    can("unidades:ver") ||
-    can("presentaciones:ver") ||
-    can("codigos-barras:ver");
+      can("sucursales:ver") ||
+      can("almacenes:ver") ||
+      can("monedas:ver") ||
+      can("tipos-cambio:ver") ||
+      can("categorias:ver") ||
+      can("productos:ver") ||
+      can("unidades:ver") ||
+      can("presentaciones:ver") ||
+      can("codigos-barras:ver");
 
   const canSecurity =
-    can("usuarios:ver") || can("roles:ver") || can("permisos:ver") || can("auditorias:ver");
+      can("usuarios:ver") || can("roles:ver") || can("permisos:ver") || can("auditorias:ver");
+
+  const canSales = can("ventas:ver");
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-neutral-900">
-      {/* HEADER */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-neutral-200">
-        {/* Línea 1: brand + perfil */}
-        <div className="mx-auto max-w-7xl px-4 h-14 flex items-center gap-3">
-          <Link to="/inicio" className="flex items-center gap-2 no-underline">
-            <img src={logo} alt="Soyanga" className="h-8 w-auto" />
-            <span className="text-emerald-700 font-semibold tracking-wide">SOYANGA</span>
-          </Link>
+      <div className="min-h-screen flex flex-col bg-white text-neutral-900">
+        {/* HEADER */}
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-neutral-200">
+          {/* Línea 1: brand + perfil */}
+          <div className="mx-auto max-w-7xl px-4 h-14 flex items-center gap-3">
+            <Link to="/inicio" className="flex items-center gap-2 no-underline">
+              <img src={logo} alt="Soyanga" className="h-8 w-auto" />
+              <span className="text-emerald-700 font-semibold tracking-wide">SOYANGA</span>
+            </Link>
 
-          <div className="ml-auto" />
-          {/* Perfil / Salir */}
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:block text-sm text-neutral-600">
-              {user?.nombreCompleto || user?.username || "Usuario"}
+            <div className="ml-auto" />
+            {/* Perfil / Salir */}
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:block text-sm text-neutral-600">
+                {user?.nombreCompleto || user?.username || "Usuario"}
+              </div>
+              <button
+                  onClick={() => logout()}
+                  className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm hover:bg-neutral-50"
+                  title="Cerrar sesión"
+              >
+                Salir
+              </button>
             </div>
-            <button
-              onClick={() => logout()}
-              className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm hover:bg-neutral-50"
-              title="Cerrar sesión"
-            >
-              Salir
-            </button>
           </div>
-        </div>
 
-        {/* Línea 2: NAV con scroll horizontal (rueda / drag / flechas) */}
-        <div className="relative border-t border-neutral-200 select-none">
-          {/* Flechas */}
-          {canScroll && (
-            <>
-              <button
-                onClick={() => scrollBy(-260)}
-                disabled={atStart}
-                className={[
-                  "hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-10",
-                  "h-8 w-8 items-center justify-center rounded-full border border-neutral-200 shadow",
-                  "bg-white hover:bg-neutral-50 transition",
-                  atStart ? "opacity-40 cursor-not-allowed" : "",
-                ].join(" ")}
-                title="Desplazar a la izquierda"
-                aria-label="Desplazar a la izquierda"
-              >
-                ‹
-              </button>
-              <button
-                onClick={() => scrollBy(260)}
-                disabled={atEnd}
-                className={[
-                  "hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-10",
-                  "h-8 w-8 items-center justify-center rounded-full border border-neutral-200 shadow",
-                  "bg-white hover:bg-neutral-50 transition",
-                  atEnd ? "opacity-40 cursor-not-allowed" : "",
-                ].join(" ")}
-                title="Desplazar a la derecha"
-                aria-label="Desplazar a la derecha"
-              >
-                ›
-              </button>
-            </>
-          )}
+          {/* Línea 2: NAV con scroll horizontal (rueda / drag / flechas) */}
+          <div className="relative border-t border-neutral-200 select-none">
+            {/* Flechas */}
+            {canScroll && (
+                <>
+                  <button
+                      onClick={() => scrollBy(-260)}
+                      disabled={atStart}
+                      className={[
+                        "hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-10",
+                        "h-8 w-8 items-center justify-center rounded-full border border-neutral-200 shadow",
+                        "bg-white hover:bg-neutral-50 transition",
+                        atStart ? "opacity-40 cursor-not-allowed" : "",
+                      ].join(" ")}
+                      title="Desplazar a la izquierda"
+                      aria-label="Desplazar a la izquierda"
+                  >
+                    ‹
+                  </button>
+                  <button
+                      onClick={() => scrollBy(260)}
+                      disabled={atEnd}
+                      className={[
+                        "hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-10",
+                        "h-8 w-8 items-center justify-center rounded-full border border-neutral-200 shadow",
+                        "bg-white hover:bg-neutral-50 transition",
+                        atEnd ? "opacity-40 cursor-not-allowed" : "",
+                      ].join(" ")}
+                      title="Desplazar a la derecha"
+                      aria-label="Desplazar a la derecha"
+                  >
+                    ›
+                  </button>
+                </>
+            )}
 
-          {/* Contenedor scrollable */}
-          <div
-            ref={navRef}
-            onScroll={updateEdges}
-            className={[
-              "mx-auto max-w-7xl px-10 py-2 overflow-x-auto overflow-y-hidden whitespace-nowrap",
-              "no-scrollbar",
-              dragging ? "cursor-grabbing" : "cursor-grab",
-            ].join(" ")}
+            {/* Contenedor scrollable */}
+            <div
+                ref={navRef}
+                onScroll={updateEdges}
+                className={[
+                  "mx-auto max-w-7xl px-10 py-2 overflow-x-auto overflow-y-hidden whitespace-nowrap",
+                  "no-scrollbar",
+                  dragging ? "cursor-grabbing" : "cursor-grab",
+                ].join(" ")}
             onMouseDown={onMouseDown}
             onMouseLeave={onMouseLeave}
             onMouseUp={onMouseUp}
@@ -248,11 +258,7 @@ export default function AppLayout() {
           >
             {/* Nav principal (con permisos) */}
             <div className="flex items-center gap-1">
-              {can("inventario:ver") && (
-                <NavLink to="/inventario/por-lote" className={navClass}>
-                  Inventario por lote
-                </NavLink>
-              )}
+             
 
               {can("ajustes:ver") && (
                 <NavLink to="/inventario/ajustes" className={navClass}>
@@ -272,94 +278,106 @@ export default function AppLayout() {
                 </NavLink>
               )}
 
-              {can("clientes:ver") && (
-                <NavLink to="/clientes" className={navClass}>
-                  Clientes
-                </NavLink>
-              )}
+                {can("clientes:ver") && (
+                    <NavLink to="/clientes" className={navClass}>
+                      Clientes
+                    </NavLink>
+                )}
 
-              {canSecurity && (
+                {canSecurity && (
                 <NavLink to="/seguridad" className={navClass}>
                   Seguridad
                 </NavLink>
               )}
+
+                {/* Inventario por lote → justo antes de API Health */}
+                 {can("inventario:ver") && (
+                <NavLink to="/inventario/por-lote" className={navClass}>
+                  Inventario por lote
+                </NavLink>
+              )}
+
+
+
+
+             
               <NavLink to="/salud" className={navClass}>
                 API Health
               </NavLink>
             </div>
+
+            {/* Fades laterales */}
+            {canScroll && !atStart && (
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
+            )}
+            {canScroll && !atEnd && (
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
+            )}
           </div>
+        </header>
 
-          {/* Fades laterales */}
-          {canScroll && !atStart && (
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
-          )}
-          {canScroll && !atEnd && (
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
-          )}
-        </div>
-      </header>
+        {/* CONTENIDO */}
+        <main className="flex-1">
+          <div className={`${isSettings ? "max-w-none px-0" : "mx-auto max-w-7xl px-4"} py-6`}>
+            <Outlet />
 
-      {/* CONTENIDO */}
-      <main className="flex-1">
-        <div className={`${isSettings ? "max-w-none px-0" : "mx-auto max-w-7xl px-4"} py-6`}>
-          <Outlet />
-        </div>
-      </main>
+          </div>
+        </main>
 
-      {/* FOOTER */}
-      <footer className="border-t border-neutral-200">
-        <div className="mx-auto max-w-7xl px-4 py-6 text-sm text-neutral-500 flex items-center justify-between">
-          <span>© {new Date().getFullYear()} Soyanga</span>
-          <span className="hidden sm:inline">Build: Frontend (Vite + React + TS)</span>
-        </div>
-      </footer>
+        {/* FOOTER */}
+        <footer className="border-t border-neutral-200">
+          <div className="mx-auto max-w-7xl px-4 py-6 text-sm text-neutral-500 flex items-center justify-between">
+            <span>© {new Date().getFullYear()} Soyanga</span>
+            <span className="hidden sm:inline">Build: Frontend (Vite + React + TS)</span>
+          </div>
+        </footer>
 
-      {/* MODAL: Sesión por expirar */}
-      {expiringOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[100]">
-          <div className="bg-white w-full max-w-md rounded-xl p-6 space-y-3 shadow-lg">
-            <h3 className="text-lg font-semibold">Tu sesión está por expirar</h3>
-            <p className="text-sm text-neutral-700">
-              Para mantenerte conectado, renueva tu sesión ahora. Tiempo restante:{" "}
-              <span className="font-semibold">{countdown}s</span>
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                className="px-3 py-2 rounded border border-neutral-300"
-                onClick={() => setExpiringOpen(false)}
-              >
-                Más tarde
-              </button>
-              <button
-                className="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
-                onClick={continuarSesion}
-              >
-                Continuar sesión
-              </button>
+        {/* MODAL: Sesión por expirar */}
+        {expiringOpen && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[100]">
+              <div className="bg-white w-full max-w-md rounded-xl p-6 space-y-3 shadow-lg">
+                <h3 className="text-lg font-semibold">Tu sesión está por expirar</h3>
+                <p className="text-sm text-neutral-700">
+                  Para mantenerte conectado, renueva tu sesión ahora. Tiempo restante:{" "}
+                  <span className="font-semibold">{countdown}s</span>
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                      className="px-3 py-2 rounded border border-neutral-300"
+                      onClick={() => setExpiringOpen(false)}
+                  >
+                    Más tarde
+                  </button>
+                  <button
+                      className="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                      onClick={continuarSesion}
+                  >
+                    Continuar sesión
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* MODAL: Sesión expirada */}
-      {expiredOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[100]">
-          <div className="bg-white w-full max-w-md rounded-xl p-6 space-y-3 shadow-lg">
-            <h3 className="text-lg font-semibold">Sesión expirada</h3>
-            <p className="text-sm text-neutral-700">
-              Tu sesión ha expirado por inactividad. Vuelve a iniciar sesión para continuar.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                className="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
-                onClick={irALogin}
-              >
-                Ir a login
-              </button>
+        {/* MODAL: Sesión expirada */}
+        {expiredOpen && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[100]">
+              <div className="bg-white w-full max-w-md rounded-xl p-6 space-y-3 shadow-lg">
+                <h3 className="text-lg font-semibold">Sesión expirada</h3>
+                <p className="text-sm text-neutral-700">
+                  Tu sesión ha expirado por inactividad. Vuelve a iniciar sesión para continuar.
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                      className="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                      onClick={irALogin}
+                  >
+                    Ir a login
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
   );
 }

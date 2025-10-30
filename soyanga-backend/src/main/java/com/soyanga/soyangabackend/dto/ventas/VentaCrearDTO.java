@@ -23,6 +23,10 @@ public class VentaCrearDTO {
     @NotNull(message = "condicionDePago es requerida (contado/credito)")
     private String condicionDePago; // 'contado' | 'credito'
 
+    private Long impuestoId;               // opcional: si es FACTURA y no viene, elegimos 1 activo
+    private java.math.BigDecimal interesCredito; // opcional: solo cuando es crédito
+
+  //  private BigDecimal interesCredito; // opcional, solo si es crédito
     private LocalDate fechaVencimientoCredito; // requerido si crédito
 
     @NotNull(message = "idAlmacenDespacho es requerido")
