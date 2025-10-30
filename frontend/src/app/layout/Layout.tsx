@@ -27,7 +27,8 @@ export default function AppLayout() {
     pathname.startsWith("/catalogo") ||
     pathname.startsWith("/config") ||
     pathname.startsWith("/compras") ||
-    pathname.startsWith("/seguridad");
+    pathname.startsWith("/seguridad") ||
+    pathname.startsWith("/inventario");
 
   /* ================== Scroll del menú superior ================== */
   const navRef = useRef<HTMLDivElement>(null);
@@ -253,6 +254,12 @@ export default function AppLayout() {
                 </NavLink>
               )}
 
+              {can("ajustes:ver") && (
+                <NavLink to="/inventario/ajustes" className={navClass}>
+                  Ajustes de inventario
+                </NavLink>
+              )}
+
               {canConfigCatalog && (
                 <NavLink to="/catalogo" className={navClass}>
                   Configuración y Catálogo
@@ -276,7 +283,6 @@ export default function AppLayout() {
                   Seguridad
                 </NavLink>
               )}
-
               <NavLink to="/salud" className={navClass}>
                 API Health
               </NavLink>

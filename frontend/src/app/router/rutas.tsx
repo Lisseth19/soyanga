@@ -66,6 +66,9 @@ import CodigosBarrasPage from "@/paginas/catalogo/CodigosBarras";
 import ComprasLayout from "../layout/ComprasLayout";
 import SeguridadLayout from "../layout/SeguridadLayout";
 import AuditoriasPage from "@/paginas/seguridad/Auditorias";
+import AjustesInventarioPage from "@/paginas/inventario/AjustesInventario";
+import InventarioLayout from "../layout/InventarioLayout";
+import MovimientosEntreAlmacenesPage from "@/paginas/inventario/MovimientosEntreAlmacenes";
 export const router = createBrowserRouter([
   // ============================
   // BLOQUE PÚBLICO (NO requiere auth)
@@ -166,15 +169,23 @@ export const router = createBrowserRouter([
           { path: "auditorias", element: <AuditoriasPage /> },
         ],
       },
-
-
-
+      {
+      path: "/inventario",
+      element: <InventarioLayout />,
+      children: [
+        { index: true, element: <Navigate to="ajustes" replace /> },
+        { path: "ajustes", element: <AjustesInventarioPage /> },
+        { path: "movimientos", element: <MovimientosEntreAlmacenesPage /> },
+      ],
+    },
 
 
 
       // Inventario
       { path: "/inventario/por-lote", element: <InventarioPorLotePage /> },
       // { path: "/inventario/productos", element: <ProductosPage /> },
+// dentro del bloque privado (donde ya tienes /inventario/por-lote y /inventario/ajustes)
+
 
       // Sucursales
       { path: "/sucursales", element: <SucursalesList /> },

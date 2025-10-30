@@ -23,13 +23,12 @@ public class TransferenciaControlador {
     // LISTADO con filtros
     @GetMapping
     public Page<TransferenciaListadoProjection> listar(
-            @RequestParam(required = false) String estado,       // pendiente | en_transito | completada | anulada
+            @RequestParam(required = false) String estado, // pendiente | en_transito | completada | anulada
             @RequestParam(required = false) Long origenId,
             @RequestParam(required = false) Long destinoId,
-            @RequestParam(required = false) String desde,        // YYYY-MM-DD
-            @RequestParam(required = false) String hasta,        // YYYY-MM-DD
-            Pageable pageable
-    ) {
+            @RequestParam(required = false) String desde, // YYYY-MM-DD
+            @RequestParam(required = false) String hasta, // YYYY-MM-DD
+            Pageable pageable) {
         return consultaServicio.listar(estado, origenId, destinoId, desde, hasta, pageable);
     }
 
@@ -58,15 +57,16 @@ public class TransferenciaControlador {
     public TransferenciaRespuestaDTO confirmarIngreso(@PathVariable Long id) {
         return servicio.confirmarIngreso(id);
     }
+
     @GetMapping("/{id}")
     public com.soyanga.soyangabackend.dto.inventario.TransferenciaDetalleDTO detalle(@PathVariable Long id) {
         return consultaServicio.detalle(id);
     }
+
     @PostMapping("/{id}/anular")
     public TransferenciaRespuestaDTO anular(
             @PathVariable Long id,
-            @RequestParam(required = false) String motivo
-    ) {
+            @RequestParam(required = false) String motivo) {
         return servicio.anular(id, motivo);
     }
 
