@@ -36,12 +36,30 @@ public class GlobalExceptionHandler {
             this.timestamp = OffsetDateTime.now().toString();
             this.errors = errors;
         }
-        public int getStatus() { return status; }
-        public String getError() { return error; }
-        public String getMessage() { return message; }
-        public String getPath() { return path; }
-        public String getTimestamp() { return timestamp; }
-        public Map<String, Object> getErrors() { return errors; }
+
+        public int getStatus() {
+            return status;
+        }
+
+        public String getError() {
+            return error;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public String getTimestamp() {
+            return timestamp;
+        }
+
+        public Map<String, Object> getErrors() {
+            return errors;
+        }
     }
 
     /* 401: credenciales inválidas (lanzadas en controlador/servicio) */
@@ -68,7 +86,7 @@ public class GlobalExceptionHandler {
     /* 400: validaciones @Valid (DTOs) */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidacion(MethodArgumentNotValidException ex, HttpServletRequest req) {
-        Map<String,Object> errs = new LinkedHashMap<>();
+        Map<String, Object> errs = new LinkedHashMap<>();
         for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
             errs.put(fe.getField(), fe.getDefaultMessage());
         }
@@ -83,8 +101,7 @@ public class GlobalExceptionHandler {
         var body = new ApiError(HttpStatus.BAD_REQUEST, msg, req.getRequestURI(), Map.of(
                 "param", ex.getName(),
                 "value", String.valueOf(ex.getValue()),
-                "requiredType", ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"
-        ));
+                "requiredType", ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"));
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -119,7 +136,7 @@ public class GlobalExceptionHandler {
     /* 400: violaciones de bean validation (Jakarta) */
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiError> handleJakartaConstraint(ConstraintViolationException ex, HttpServletRequest req) {
-        Map<String,Object> errs = new LinkedHashMap<>();
+        Map<String, Object> errs = new LinkedHashMap<>();
         ex.getConstraintViolations().forEach(cv -> errs.put(cv.getPropertyPath().toString(), cv.getMessage()));
         var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricciones", req.getRequestURI(), errs);
         return ResponseEntity.badRequest().body(body);
@@ -127,16 +144,18 @@ public class GlobalExceptionHandler {
 
     /* 400: Hibernate ConstraintViolation (si llega sin envolver) */
     @ExceptionHandler(org.hibernate.exception.ConstraintViolationException.class)
-    public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex, HttpServletRequest req) {
-        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos", req.getRequestURI(), null);
+    public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex,
+            HttpServletRequest req) {
+        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos",
+                req.getRequestURI(), null);
         return ResponseEntity.badRequest().body(body);
     }
 
     /* 500: genérico (lo no manejado) */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleAll(Exception ex, HttpServletRequest req) {
-        // TODO: loguear 'ex' con stacktrace (logger)
-        var body = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", req.getRequestURI(), null);
+        var body = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", req.getRequestURI(),
+                null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }

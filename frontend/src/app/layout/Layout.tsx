@@ -24,11 +24,13 @@ export default function AppLayout() {
 
   // 👉 pantallas con layout de módulo (sidebar): full-bleed
   const isSettings =
-      pathname.startsWith("/catalogo") ||
-      pathname.startsWith("/config") ||
-      pathname.startsWith("/compras") ||
-      pathname.startsWith("/seguridad") ||
-      pathname.startsWith("/ventas");
+
+    pathname.startsWith("/catalogo") ||
+    pathname.startsWith("/config") ||
+    pathname.startsWith("/compras") ||
+    pathname.startsWith("/seguridad") ||
+    pathname.startsWith("/inventario");
+    pathname.startsWith("/ventas");
 
   /* ================== Scroll del menú superior ================== */
   const navRef = useRef<HTMLDivElement>(null);
@@ -249,31 +251,32 @@ export default function AppLayout() {
                   "no-scrollbar",
                   dragging ? "cursor-grabbing" : "cursor-grab",
                 ].join(" ")}
-                onMouseDown={onMouseDown}
-                onMouseLeave={onMouseLeave}
-                onMouseUp={onMouseUp}
-                onMouseMove={onMouseMove}
-            >
-              {/* Nav principal (con permisos) */}
-              <div className="flex items-center gap-1">
-                {/* Reordenado: Inventario por lote va al final, antes de API Health */}
-                {canConfigCatalog && (
-                    <NavLink to="/catalogo" className={navClass}>
-                      Configuración y Catálogo
-                    </NavLink>
-                )}
+            onMouseDown={onMouseDown}
+            onMouseLeave={onMouseLeave}
+            onMouseUp={onMouseUp}
+            onMouseMove={onMouseMove}
+          >
+            {/* Nav principal (con permisos) */}
+            <div className="flex items-center gap-1">
+             
 
-                {can("compras:ver") && (
-                    <NavLink to="/compras" className={navClass}>
-                      Compras
-                    </NavLink>
-                )}
+              {can("ajustes:ver") && (
+                <NavLink to="/inventario/ajustes" className={navClass}>
+                  Ajustes de inventario
+                </NavLink>
+              )}
 
-                {canSales && (
-                    <NavLink to="/ventas" className={navClass}>
-                      Ventas
-                    </NavLink>
-                )}
+              {canConfigCatalog && (
+                <NavLink to="/catalogo" className={navClass}>
+                  Configuración y Catálogo
+                </NavLink>
+              )}
+
+              {can("compras:ver") && (
+                <NavLink to="/compras" className={navClass}>
+                  Compras
+                </NavLink>
+              )}
 
                 {can("clientes:ver") && (
                     <NavLink to="/clientes" className={navClass}>
@@ -282,22 +285,25 @@ export default function AppLayout() {
                 )}
 
                 {canSecurity && (
-                    <NavLink to="/seguridad" className={navClass}>
-                      Seguridad
-                    </NavLink>
-                )}
+                <NavLink to="/seguridad" className={navClass}>
+                  Seguridad
+                </NavLink>
+              )}
 
                 {/* Inventario por lote → justo antes de API Health */}
-                {can("inventario:ver") && (
-                    <NavLink to="/inventario/por-lote" className={navClass}>
-                      Inventario por lote
-                    </NavLink>
-                )}
-
-                <NavLink to="/salud" className={navClass}>
-                  API Health
+                 {can("inventario:ver") && (
+                <NavLink to="/inventario/por-lote" className={navClass}>
+                  Inventario por lote
                 </NavLink>
-              </div>
+              )}
+
+
+
+
+             
+              <NavLink to="/salud" className={navClass}>
+                API Health
+              </NavLink>
             </div>
 
             {/* Fades laterales */}
@@ -314,6 +320,7 @@ export default function AppLayout() {
         <main className="flex-1">
           <div className={`${isSettings ? "max-w-none px-0" : "mx-auto max-w-7xl px-4"} py-6`}>
             <Outlet />
+
           </div>
         </main>
 

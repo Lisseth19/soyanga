@@ -99,3 +99,12 @@ export async function getMovimientosDeLote(
 
 // (opcional) re-exporta el tipo UI para que el Modal pueda importar desde el servicio
 export type { MovimientoDeInventario } from "@/types/inventario-lotes";
+
+export async function lotesOptionsByAlmacen(idAlmacen: number) {
+  const page = await getInventarioPorLote({ idAlmacen, size: 200 });
+  return page.content.map(it => ({
+    id: it.idLote,
+    nombre: `${it.codigoLote} — ${it.nombreProducto}`,
+    stock: it.disponible
+  }));
+}

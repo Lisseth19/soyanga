@@ -21,7 +21,8 @@ public class AuthControlador {
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.OK)
     public AuthTokensDTO login(@Valid @RequestBody AuthLoginDTO dto) {
-        // El servicio autentica y construye AuthTokensDTO (tokenType, accessToken, expiresIn, refreshToken)
+        // El servicio autentica y construye AuthTokensDTO (tokenType, accessToken,
+        // expiresIn, refreshToken)
         return servicio.login(dto);
     }
 
