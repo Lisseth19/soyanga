@@ -4,8 +4,8 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 // Layouts
 import AppLayout from "../layout/Layout";              // layout ADMIN
 import PublicLayout from "../layout/PublicLayout";     // layout PÚBLICO
-import ComprasLayout from "../layout/ComprasLayout";   // Layout del módulo Compras
-import SeguridadLayout from "../layout/SeguridadLayout";
+//import ComprasLayout from "../layout/ComprasLayout";   // Layout del módulo Compras
+//import SeguridadLayout from "../layout/SeguridadLayout";
 import SettingsLayout from "../layout/SettingsLayout";
 // NUEVO: Layout del módulo Ventas
 import VentasLayout from "../layout/VentasLayout";
@@ -61,7 +61,7 @@ import ProveedoresPage from "@/paginas/proveedor/Proveedores";
 import UsuariosPage from "@/paginas/seguridad/Usuarios";
 import RolesPage from "@/paginas/seguridad/Roles";
 import PermisosPage from "@/paginas/seguridad/Permisos";
-import AuditoriasPage from "@/paginas/seguridad/Auditorias";
+//import AuditoriasPage from "@/paginas/seguridad/Auditorias";
 
 import SucursalesList from "@/paginas/sucursales/SucursalesList";
 import AlmacenesPage from "@/paginas/almacenes/almacen";
@@ -82,6 +82,7 @@ import AuditoriasPage from "@/paginas/seguridad/Auditorias";
 import AjustesInventarioPage from "@/paginas/inventario/AjustesInventario";
 import InventarioLayout from "../layout/InventarioLayout";
 import MovimientosEntreAlmacenesPage from "@/paginas/inventario/MovimientosEntreAlmacenes";
+import AlertasInventarioPage from "@/paginas/inventario/AlertasInventario";
 
 export const router = createBrowserRouter([
   // ============================
@@ -213,6 +214,7 @@ export const router = createBrowserRouter([
         { index: true, element: <Navigate to="ajustes" replace /> },
         { path: "ajustes", element: <AjustesInventarioPage /> },
         { path: "movimientos", element: <MovimientosEntreAlmacenesPage /> },
+        { path: "alertas", element: <AlertasInventarioPage /> },
       ],
     },
 

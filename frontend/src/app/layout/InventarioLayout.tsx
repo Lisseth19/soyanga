@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Boxes, Settings2, ArrowLeftRight } from "lucide-react";
+import { Boxes, Settings2, ArrowLeftRight, BellRing } from "lucide-react"; // ← ícono nuevo
 
 function itemClass(isActive: boolean) {
   return [
@@ -10,7 +10,6 @@ function itemClass(isActive: boolean) {
 
 export default function InventarioLayout() {
   return (
-    // sin padding horizontal para que el sidebar quede totalmente a la izquierda
     <div className="py-6">
       <div className="grid grid-cols-12 gap-4">
         {/* SIDEBAR */}
@@ -30,6 +29,12 @@ export default function InventarioLayout() {
               <NavLink to="movimientos" className={({ isActive }) => itemClass(isActive)}>
                 <ArrowLeftRight className="h-4 w-4" />
                 <span>Movimiento entre almacenes</span>
+              </NavLink>
+
+              {/* Alertas → ícono representativo y ruta relativa */}
+              <NavLink to="alertas" className={({ isActive }) => itemClass(isActive)}>
+                <BellRing className="h-4 w-4" />
+                <span>Alertas de stock</span>
               </NavLink>
             </nav>
           </div>
