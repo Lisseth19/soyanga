@@ -1,97 +1,105 @@
 package com.soyanga.soyangabackend.configuracion;
 
 import com.soyanga.soyangabackend.dto.seguridad.*;
+import com.soyanga.soyangabackend.repositorio.seguridad.UsuarioRepositorio;
 import com.soyanga.soyangabackend.servicio.seguridad.RolServicio;
 import com.soyanga.soyangabackend.servicio.seguridad.UsuarioServicio;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.CommandLineRunner;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Configuration
 @RequiredArgsConstructor
-public class BootstrapAdmin implements CommandLineRunner {
+@ConditionalOnProperty(name = "app.bootstrap.admin.enabled", havingValue = "true", matchIfMissing = true)
+public class BootstrapAdmin implements ApplicationRunner {
 
+    private final UsuarioRepositorio usuarioRepo;
     private final UsuarioServicio usuarioServicio;
     private final RolServicio rolServicio;
 
+    @Value("${app.bootstrap.admin.username:admin}")
+    private String adminUsername;
+
+    @Value("${app.bootstrap.admin.email:admin@local}")
+    private String adminEmail;
+
+    @Value("${app.bootstrap.admin.password:Admin12345}")
+    private String adminPassword;
+
+    @Value("${app.bootstrap.admin.rol:ADMIN}")
+    private String adminRoleName;
+
     @Override
-    public void run(String... args) {
-        final String USERNAME  = "admin";
-        final String PASSWORD  = "admin123";
-        final String ROLE_NAME = "ADMIN";
+    @Transactional
+    public void run(ApplicationArguments args) {
+        // 1) Rol ADMIN (buscar por nombre exacto; si no existe, crear)
+        Long idRolAdmin = findOrCreateAdminRole(adminRoleName);
 
-        // 1) Buscar o crear rol ADMIN
-        RolRespuestaDTO rolAdmin = findRoleByExactName(ROLE_NAME);
-        if (rolAdmin == null) {
-            rolAdmin = rolServicio.crear(RolCrearDTO.builder()
-                    .nombreRol(ROLE_NAME)                 // si tu DTO usa .nombre(), cámbialo aquí
-                    .descripcion("Superadministrador")
-                    .build());
-        }
-        final Long idRolAdmin = rolAdmin.getIdRol();
+        // 2) Usuario admin (buscar por username o email directos en el repo, NO usar listar())
+        var existente = usuarioRepo.findByNombreUsuarioIgnoreCase(adminUsername)
+                .or(() -> usuarioRepo.findByCorreoElectronicoIgnoreCase(adminEmail))
+                .orElse(null);
 
-        // 2) Buscar o crear usuario admin
-        UsuarioRespuestaDTO admin = findUserByExactUsername(USERNAME);
-        if (admin == null) {
-            admin = usuarioServicio.crear(UsuarioCrearDTO.builder()
-                    .nombreUsuario(USERNAME)             // username
-                    .contrasena(PASSWORD)                // cámbialo luego
-                    .nombreCompleto("Admin Root")        // o .nombres("Admin").apellidos("Root")
-                    .correoElectronico("admin@local")
+        UsuarioRespuestaDTO adminDTO;
+        if (existente == null) {
+            log.info("[BootstrapAdmin] Creando usuario admin inicial: {} / {}", adminUsername, adminEmail);
+            adminDTO = usuarioServicio.crear(UsuarioCrearDTO.builder()
+                    .nombreUsuario(adminUsername)
+                    .contrasena(adminPassword)
+                    .nombreCompleto("Administrador")
+                    .correoElectronico(adminEmail)
                     .telefono("00000000")
                     .estadoActivo(true)
                     .build());
+        } else {
+            log.info("[BootstrapAdmin] Admin ya existe: {} / {}. No se crea nuevamente.", adminUsername, adminEmail);
+            adminDTO = usuarioServicio.obtener(existente.getIdUsuario());
         }
-        final Long idUsuario = admin.getIdUsuario();
 
-        // 3) Cargar usuario con roles y decidir si hace falta asignar ADMIN
-        UsuarioRespuestaDTO adminFull = usuarioServicio.obtener(idUsuario); // devuelve roles
-        boolean tieneAdmin = false;
-        final List<Long> rolesActuales = new ArrayList<>();
-
-        if (adminFull.getRoles() != null) {
-            for (UsuarioRespuestaDTO.RolMiniDTO r : adminFull.getRoles()) {
+        // 3) Asegurar que tiene el rol ADMIN (unir con roles actuales sin duplicar)
+        var rolesActuales = new ArrayList<Long>();
+        boolean yaEsAdmin = false;
+        if (adminDTO.getRoles() != null) {
+            for (UsuarioRespuestaDTO.RolMiniDTO r : adminDTO.getRoles()) {
                 if (r == null) continue;
                 rolesActuales.add(r.getIdRol());
-                if (idRolAdmin.equals(r.getIdRol())) {
-                    tieneAdmin = true;
-                }
+                if (r.getIdRol().equals(idRolAdmin)) yaEsAdmin = true;
             }
         }
-
-        if (!tieneAdmin) {
-            rolesActuales.add(idRolAdmin); // unión: roles actuales + ADMIN (sin duplicados)
+        if (!yaEsAdmin) {
+            rolesActuales.add(idRolAdmin);
             usuarioServicio.asignarRoles(
-                    idUsuario,
-                    UsuarioAsignarRolesDTO.builder()
-                            .rolesIds(rolesActuales) // si tu DTO usa idsRoles, cámbialo a .idsRoles(…)
-                            .build()
+                    adminDTO.getIdUsuario(),
+                    UsuarioAsignarRolesDTO.builder().rolesIds(rolesActuales).build()
             );
+            log.info("[BootstrapAdmin] Asignado rol {} al admin.", adminRoleName);
         }
 
-        System.out.println("=== Usuario inicial listo: " + USERNAME + " / " + PASSWORD + " ===");
+        log.info("=== Usuario inicial listo: {} / {} ===", adminUsername, adminPassword);
     }
 
-    private RolRespuestaDTO findRoleByExactName(String name) {
-        Page<RolRespuestaDTO> page = rolServicio.listar(name, PageRequest.of(0, 50));
-        if (page == null || page.getContent() == null) return null;
-        for (RolRespuestaDTO r : page.getContent()) {
-            if (r != null && name.equalsIgnoreCase(r.getNombreRol())) return r;
-        }
-        return null;
-    }
+    private Long findOrCreateAdminRole(String roleName) {
+        // Busca por nombre exacto a través del servicio (o crea)
+        var page = rolServicio.listar(roleName, org.springframework.data.domain.PageRequest.of(0, 50));
+        var encontrado = page.getContent().stream()
+                .filter(r -> r != null && roleName.equalsIgnoreCase(r.getNombreRol()))
+                .findFirst()
+                .orElse(null);
+        if (encontrado != null) return encontrado.getIdRol();
 
-    private UsuarioRespuestaDTO findUserByExactUsername(String username) {
-        Page<UsuarioRespuestaDTO> page = usuarioServicio.listar(username, false, PageRequest.of(0, 50));
-        if (page == null || page.getContent() == null) return null;
-        for (UsuarioRespuestaDTO u : page.getContent()) {
-            if (u != null && username.equalsIgnoreCase(u.getNombreUsuario())) return u;
-        }
-        return null;
+        var creado = rolServicio.crear(RolCrearDTO.builder()
+                .nombreRol(roleName)
+                .descripcion("Rol de superadministrador")
+                .build());
+        return creado.getIdRol();
     }
 }

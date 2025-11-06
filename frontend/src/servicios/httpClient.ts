@@ -290,7 +290,12 @@ async function coreFetch<T, B = unknown>(path: string, options: HttpOptions<B> =
           if (t) { details = t; message = t; }
         }
       } catch { /* ignore */ }
-
+      if (res.status === 403) {
+        // dispara un evento global para que AuthContext refresque permisos
+        window.dispatchEvent(new CustomEvent("auth:forbidden", { detail: { path, method } }));
+        // opcional: mostrar un toast/alert global
+        // alert("No tienes permiso para realizar esta acción.");
+      }
       throw new ApiError(message, { status: res.status, details });
 
     } catch (err: any) {

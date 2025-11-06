@@ -14,12 +14,14 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.*;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
 @Configuration
-@EnableMethodSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -41,18 +43,25 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // preflight
                         .requestMatchers("/api/v1/auth/login").permitAll()
                         .requestMatchers("/api/v1/auth/refresh").permitAll()
+
+                        // NUEVO: flujo de restablecimiento de contraseña (sin token)
+                        .requestMatchers("/api/v1/auth/password-reset/**").permitAll()
+                        // ↑↑↑ cubre /request y /confirm
+
+                        // Swagger (si lo usas)
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
-                                "/swagger-ui/**")
-                        .permitAll()
+                                "/swagger-ui/**"
+                        ).permitAll()
 
                         // Catálogo PÚBLICO (solo lectura)
                         .requestMatchers(HttpMethod.GET, "/api/v1/catalogo/publico/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
                         // ---- Todo lo demás requiere token ------------------------------
-                        .anyRequest().authenticated())
+                        .anyRequest().authenticated()
+                )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -64,8 +73,8 @@ public class SecurityConfig {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             response.setContentType("application/json");
             response.getWriter().write("""
-                    {"status":401,"message":"No autorizado","path":"%s"}
-                    """.formatted(request.getRequestURI()));
+                {"status":401,"message":"No autorizado","path":"%s"}
+                """.formatted(request.getRequestURI()));
         };
     }
 
@@ -75,41 +84,29 @@ public class SecurityConfig {
             response.setStatus(HttpStatus.FORBIDDEN.value());
             response.setContentType("application/json");
             response.getWriter().write("""
-                    {"status":403,"message":"Acceso denegado","path":"%s"}
-                    """.formatted(request.getRequestURI()));
+                {"status":403,"message":"Acceso denegado","path":"%s"}
+                """.formatted(request.getRequestURI()));
         };
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        var cfg = new CorsConfiguration();
-        cfg.setAllowedOrigins(List.of(
-                "http://localhost:5173", // Vite
-                "http://localhost:4200",
-                "http://192.168.2.112:5173" // (si lo usas)
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://192.168.0.204:*",
+                "http://192.168.*:*",
+                "http://10.*:*"
         ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        cfg.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setExposedHeaders(List.of("Authorization"));
         cfg.setAllowCredentials(true);
         cfg.setMaxAge(3600L);
 
-        var source = new UrlBasedCorsConfigurationSource();
-        // Si quieres CORS más estricto SOLO para el público:
-        // source.registerCorsConfiguration("/api/v1/catalogo/publico/**",
-        // cfgPublicoSoloGET());
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);
         return source;
-    }
-
-    // (Opcional) CORS solo GET para el público
-    @SuppressWarnings("unused")
-    private CorsConfiguration cfgPublicoSoloGET() {
-        var c = new CorsConfiguration();
-        c.setAllowedOrigins(List.of("http://localhost:5173"));
-        c.setAllowedMethods(List.of("GET", "OPTIONS"));
-        c.setAllowedHeaders(List.of("Content-Type", "Accept"));
-        c.setAllowCredentials(false);
-        c.setMaxAge(3600L);
-        return c;
     }
 }

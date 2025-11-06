@@ -29,6 +29,16 @@ public interface UsuarioRepositorio extends BaseRepository<Usuario, Long> {
                OR u.correo_electronico ILIKE CONCAT('%', :q, '%')
                OR u.nombre_usuario     ILIKE CONCAT('%', :q, '%'))
           AND (:soloActivos = FALSE OR u.estado_activo = TRUE)
+          AND (
+              :excluirAdmins = FALSE
+              OR NOT EXISTS (
+                    SELECT 1
+                    FROM usuarios_roles ur
+                    JOIN roles r ON r.id_rol = ur.id_rol AND r.estado_activo = TRUE
+                    WHERE ur.id_usuario = u.id_usuario
+                      AND UPPER(r.nombre_rol) LIKE '%%ADMIN%%'
+              )
+          )
         ORDER BY u.nombre_completo ASC, u.id_usuario ASC
         """,
             countQuery = """
@@ -39,10 +49,21 @@ public interface UsuarioRepositorio extends BaseRepository<Usuario, Long> {
                OR u.correo_electronico ILIKE CONCAT('%', :q, '%')
                OR u.nombre_usuario     ILIKE CONCAT('%', :q, '%'))
           AND (:soloActivos = FALSE OR u.estado_activo = TRUE)
+          AND (
+              :excluirAdmins = FALSE
+              OR NOT EXISTS (
+                    SELECT 1
+                    FROM usuarios_roles ur
+                    JOIN roles r ON r.id_rol = ur.id_rol AND r.estado_activo = TRUE
+                    WHERE ur.id_usuario = u.id_usuario
+                      AND UPPER(r.nombre_rol) LIKE '%%ADMIN%%'
+              )
+          )
         """,
             nativeQuery = true)
     Page<UsuarioListadoProjection> listar(@Param("q") String q,
                                           @Param("soloActivos") boolean soloActivos,
+                                          @Param("excluirAdmins") boolean excluirAdmins,
                                           Pageable pageable);
 
     @Query(value = """
@@ -66,4 +87,16 @@ public interface UsuarioRepositorio extends BaseRepository<Usuario, Long> {
         ORDER BY p.nombre_permiso ASC
         """, nativeQuery = true)
     List<String> permisosDeUsuario(@Param("idUsuario") Long idUsuario);
+
+    // Helper opcional si lo necesitas en otros lados
+    @Query(value = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM usuarios_roles ur
+            JOIN roles r ON r.id_rol = ur.id_rol AND r.estado_activo = TRUE
+            WHERE ur.id_usuario = :idUsuario
+              AND UPPER(r.nombre_rol) LIKE '%%ADMIN%%'
+        )
+        """, nativeQuery = true)
+    boolean esAdmin(@Param("idUsuario") Long idUsuario);
 }

@@ -1,3 +1,4 @@
+// src/servicios/cliente.ts
 import { http } from "./httpClient";
 import type { Page } from "@/types/pagination";
 import type {
@@ -7,6 +8,7 @@ import type {
     ClienteEstadoDTO,
 } from "@/types/cliente";
 
+// Alinear con el controlador: @RequestMapping("/api/v1/clientes")
 const BASE = "/v1/clientes";
 
 export interface ClientesFiltro {
@@ -25,7 +27,12 @@ export interface ClientesFiltro {
 function toBackendCrear(dto: ClienteCrearDTO | any) {
     return {
         // alias comunes: razonSocial, nombreCliente, nombre
-        razonSocialONombre: (dto?.razonSocialONombre ?? dto?.razonSocial ?? dto?.nombreCliente ?? dto?.nombre ?? "").trim(),
+        razonSocialONombre:
+            (dto?.razonSocialONombre ??
+                dto?.razonSocial ??
+                dto?.nombreCliente ??
+                dto?.nombre ??
+                "").trim(),
         nit: dto?.nit?.trim?.() ?? null,
         telefono: dto?.telefono?.trim?.() ?? null,
         correoElectronico: dto?.correoElectronico?.trim?.() ?? null,
@@ -69,6 +76,10 @@ export const ClienteService = {
 
     eliminar: (id: number) => http.del<void>(`${BASE}/${id}`),
 
-    cambiarEstado: (id: number, dto: ClienteEstadoDTO) =>
-        http.patch<Cliente, ClienteEstadoDTO>(`${BASE}/${id}/estado`, dto),
+    // ✅ Acepta boolean o DTO; siempre envía { activo: boolean }
+    cambiarEstado: (id: number, body: boolean | ClienteEstadoDTO) => {
+        const dto: ClienteEstadoDTO =
+            typeof body === "boolean" ? { activo: body } : body;
+        return http.patch<void, ClienteEstadoDTO>(`${BASE}/${id}/estado`, dto);
+    },
 };

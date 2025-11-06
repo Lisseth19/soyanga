@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.*;
 
@@ -37,53 +38,36 @@ public class GlobalExceptionHandler {
             this.errors = errors;
         }
 
-        public int getStatus() {
-            return status;
-        }
-
-        public String getError() {
-            return error;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public String getPath() {
-            return path;
-        }
-
-        public String getTimestamp() {
-            return timestamp;
-        }
-
-        public Map<String, Object> getErrors() {
-            return errors;
-        }
+        public int getStatus() { return status; }
+        public String getError() { return error; }
+        public String getMessage() { return message; }
+        public String getPath() { return path; }
+        public String getTimestamp() { return timestamp; }
+        public Map<String, Object> getErrors() { return errors; }
     }
 
-    /* 401: credenciales inválidas (lanzadas en controlador/servicio) */
+    /* ================== Auth / permisos ================== */
+
     @ExceptionHandler({ BadCredentialsException.class, UsernameNotFoundException.class, AuthenticationException.class })
     public ResponseEntity<ApiError> handleCredenciales(Exception ex, HttpServletRequest req) {
         var body = new ApiError(HttpStatus.UNAUTHORIZED, "Usuario o contraseña inválidos", req.getRequestURI(), null);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
     }
 
-    /* 423: usuario deshabilitado */
     @ExceptionHandler(DisabledException.class)
     public ResponseEntity<ApiError> handleDisabled(DisabledException ex, HttpServletRequest req) {
         var body = new ApiError(HttpStatus.LOCKED, "Usuario deshabilitado", req.getRequestURI(), null);
         return ResponseEntity.status(HttpStatus.LOCKED).body(body);
     }
 
-    /* 403: sin permisos (si se lanza desde código de aplicación) */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
         var body = new ApiError(HttpStatus.FORBIDDEN, "Acceso denegado", req.getRequestURI(), null);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
-    /* 400: validaciones @Valid (DTOs) */
+    /* ================== Validaciones y parámetros ================== */
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidacion(MethodArgumentNotValidException ex, HttpServletRequest req) {
         Map<String, Object> errs = new LinkedHashMap<>();
@@ -94,46 +78,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    /* 400: parámetros de path/query mal tipados (?page=abc, etc.) */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
         var msg = "Parámetro inválido: " + ex.getName();
-        var body = new ApiError(HttpStatus.BAD_REQUEST, msg, req.getRequestURI(), Map.of(
+        var body = new ApiError(
+            HttpStatus.BAD_REQUEST,
+            msg,
+            req.getRequestURI(),
+            Map.of(
                 "param", ex.getName(),
                 "value", String.valueOf(ex.getValue()),
-                "requiredType", ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"));
+                "requiredType", ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"
+            )
+        );
         return ResponseEntity.badRequest().body(body);
     }
 
-    /* 400: argumentos inválidos de tu lógica */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> handleIllegalArg(IllegalArgumentException ex, HttpServletRequest req) {
         var body = new ApiError(HttpStatus.BAD_REQUEST, ex.getMessage(), req.getRequestURI(), null);
         return ResponseEntity.badRequest().body(body);
     }
 
-    /* 400: violaciones de integridad (duplicados, FK, UNIQUE, NOT NULL) */
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
-        String msg = "Violación de integridad de datos";
-        String raw = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
-        if (raw != null) {
-            String low = raw.toLowerCase();
-            if (low.contains("uk_roles_nombre") || low.contains("nombre_rol")) {
-                msg = "Nombre de rol ya existe.";
-            } else if (low.contains("uk_usuario_rol") || low.contains("usuarios_roles")) {
-                msg = "Asignación duplicada usuario-rol.";
-            } else if (low.contains("uk_permisos_nombre") || (low.contains("permisos") && low.contains("unique"))) {
-                msg = "Permiso duplicado.";
-            } else if (low.contains("not null")) {
-                msg = "Campo requerido ausente.";
-            }
-        }
-        var body = new ApiError(HttpStatus.BAD_REQUEST, msg, req.getRequestURI(), null);
-        return ResponseEntity.badRequest().body(body);
-    }
-
-    /* 400: violaciones de bean validation (Jakarta) */
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiError> handleJakartaConstraint(ConstraintViolationException ex, HttpServletRequest req) {
         Map<String, Object> errs = new LinkedHashMap<>();
@@ -142,20 +108,180 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    /* 400: Hibernate ConstraintViolation (si llega sin envolver) */
-    @ExceptionHandler(org.hibernate.exception.ConstraintViolationException.class)
-    public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex,
-            HttpServletRequest req) {
-        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos",
-                req.getRequestURI(), null);
+    /* ================== Integridad de datos (FK / UNIQUE / NOT NULL) ================== */
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
+        // Info técnica (SQLState, constraint, etc.)
+        var info = extractSqlInfo(ex);
+        String sqlState = info.sqlState;
+        Integer vendorCode = info.vendorCode;
+        String constraintName = info.constraintName;
+        String raw = info.rawMessage;
+
+        // Mensajes del servicio (si ya dio uno humano)
+        String custom = ex.getMessage() != null ? ex.getMessage() : "";
+        String low = ((raw != null ? raw : "") + " " + custom).toLowerCase(Locale.ROOT);
+
+        // Postgres
+        boolean isPgForeignKey = "23503".equals(sqlState);
+        boolean isPgUnique     = "23505".equals(sqlState);
+        boolean isPgNotNull    = "23502".equals(sqlState);
+
+        // MySQL
+        boolean isMyForeignKey = vendorCode != null && (vendorCode == 1451 || vendorCode == 1452);
+        boolean isMyUnique     = vendorCode != null && vendorCode == 1062;
+        boolean isMyNotNull    = vendorCode != null && vendorCode == 1048;
+
+        // Heurísticas por mensaje
+        boolean msgForeign = low.contains("violates foreign key constraint") || low.contains("a foreign key constraint fails");
+        boolean msgUnique  = low.contains("duplicate key") || low.contains("duplicate entry");
+        boolean msgNotNull = low.contains("null value in column") || low.contains("cannot be null");
+
+        Map<String,Object> extra = new LinkedHashMap<>();
+        if (constraintName != null) extra.put("constraint", constraintName);
+
+        // ✅ Prioridad: si el servicio ya dio un mensaje humano claro, úsalo tal cual (ej. clientes)
+        if (custom.toLowerCase(Locale.ROOT).contains("no se puede eliminar el cliente")) {
+            var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty()? null: extra);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+        // (opcional) otros mensajes específicos del servicio
+        if (custom.toLowerCase(Locale.ROOT).contains("no se puede eliminar el proveedor")) {
+            var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty()? null: extra);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+
+        // FK → 409 con mensaje genérico o específico
+        if (isPgForeignKey || isMyForeignKey || msgForeign) {
+            String friendly = "No se puede completar la operación porque el registro está en uso por otros recursos.";
+            // Personalización por constraint: ejemplo unidades/presentaciones
+            if (constraintName != null) {
+                String c = constraintName.toLowerCase(Locale.ROOT);
+                if (c.contains("present") && c.contains("unidad")) {
+                    friendly = "No se puede eliminar la unidad porque está en uso por presentaciones.";
+                }
+            } else if (low.contains("present") && low.contains("unidad")) {
+                friendly = "No se puede eliminar la unidad porque está en uso por presentaciones.";
+            }
+            var body = new ApiError(HttpStatus.CONFLICT, friendly, req.getRequestURI(), extra.isEmpty()? null: extra);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+
+        // UNIQUE → 409
+        if (isPgUnique || isMyUnique || msgUnique) {
+            String friendly = "Registro duplicado.";
+            if (constraintName != null) {
+                String c = constraintName.toLowerCase(Locale.ROOT);
+                if (c.contains("uk_unidad_simbolo") || (c.contains("uniq") && c.contains("simbolo"))) {
+                    friendly = "Ya existe una unidad con ese símbolo.";
+                } else if (c.contains("uk_unidad_nombre") || (c.contains("uniq") && c.contains("nombre"))) {
+                    friendly = "Ya existe una unidad con ese nombre.";
+                }
+            } else if (low.contains("simbolo")) {
+                friendly = "Ya existe una unidad con ese símbolo.";
+            }
+            var body = new ApiError(HttpStatus.CONFLICT, friendly, req.getRequestURI(), extra.isEmpty()? null: extra);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+
+        // NOT NULL → 400
+        if (isPgNotNull || isMyNotNull || msgNotNull) {
+            var body = new ApiError(HttpStatus.BAD_REQUEST, "Campo requerido ausente.", req.getRequestURI(), extra.isEmpty()? null: extra);
+            return ResponseEntity.badRequest().body(body);
+        }
+
+        // Genérico
+        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de integridad de datos", req.getRequestURI(), extra.isEmpty()? null: extra);
         return ResponseEntity.badRequest().body(body);
     }
 
-    /* 500: genérico (lo no manejado) */
+    // (si Hibernate deja pasar su ConstraintViolationException sin envolver)
+    @ExceptionHandler(org.hibernate.exception.ConstraintViolationException.class)
+    public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex,
+                                                              HttpServletRequest req) {
+        String constraintName = ex.getConstraintName();
+        String sqlState = null;
+        Integer vendorCode = null;
+        if (ex.getCause() instanceof SQLException sql) {
+            sqlState = sql.getSQLState();
+            vendorCode = sql.getErrorCode();
+        }
+        Map<String,Object> extra = new LinkedHashMap<>();
+        if (constraintName != null) extra.put("constraint", constraintName);
+
+        boolean isPgForeignKey = "23503".equals(sqlState);
+        boolean isPgUnique     = "23505".equals(sqlState);
+
+        if (isPgForeignKey) {
+            String msg = "No se puede completar la operación porque el registro está en uso por otros recursos.";
+            if (constraintName != null) {
+                String c = constraintName.toLowerCase(Locale.ROOT);
+                if (c.contains("present") && c.contains("unidad")) {
+                    msg = "No se puede eliminar la unidad porque está en uso por presentaciones.";
+                }
+            }
+            var body = new ApiError(HttpStatus.CONFLICT, msg, req.getRequestURI(), extra.isEmpty()? null: extra);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+        if (isPgUnique) {
+            var body = new ApiError(HttpStatus.CONFLICT, "Registro duplicado.", req.getRequestURI(), extra.isEmpty()? null: extra);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+
+        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos", req.getRequestURI(), extra.isEmpty()? null: extra);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    /* ================== 500 genérico ================== */
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleAll(Exception ex, HttpServletRequest req) {
-        var body = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", req.getRequestURI(),
-                null);
+        var body = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", req.getRequestURI(), null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    /* ================== Helpers ================== */
+
+    private static class SqlInfo {
+        final String sqlState;
+        final Integer vendorCode;
+        final String constraintName;
+        final String rawMessage;
+        SqlInfo(String sqlState, Integer vendorCode, String constraintName, String rawMessage) {
+            this.sqlState = sqlState;
+            this.vendorCode = vendorCode;
+            this.constraintName = constraintName;
+            this.rawMessage = rawMessage;
+        }
+    }
+
+    private SqlInfo extractSqlInfo(Throwable ex) {
+        String sqlState = null;
+        Integer vendor = null;
+        String constraint = null;
+        String raw = ex.getMessage();
+
+        if (ex instanceof org.hibernate.exception.ConstraintViolationException hce) {
+            constraint = hce.getConstraintName();
+            if (hce.getCause() instanceof SQLException sql) {
+                sqlState = sql.getSQLState();
+                vendor = sql.getErrorCode();
+                raw = sql.getMessage();
+            }
+        }
+
+        // Recorremos causes para encontrar SQLException si no la teníamos
+        Throwable cur = ex;
+        while (cur != null) {
+            if (cur instanceof SQLException sql) {
+                if (sqlState == null) sqlState = sql.getSQLState();
+                if (vendor == null) vendor = sql.getErrorCode();
+                if (raw == null || raw.isBlank()) raw = sql.getMessage();
+            }
+            cur = cur.getCause();
+        }
+
+        return new SqlInfo(sqlState, vendor, constraint, raw);
     }
 }

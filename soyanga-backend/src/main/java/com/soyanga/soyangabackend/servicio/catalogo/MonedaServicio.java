@@ -9,6 +9,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -142,11 +144,29 @@ public class MonedaServicio {
         String nuevoCodigo = dto.codigo().trim().toUpperCase();
         String nuevoNombre = dto.nombre().trim();
 
+        // Duplicado de código (excluyendo la misma)
         repo.findByCodigoMonedaIgnoreCase(nuevoCodigo).ifPresent(existente -> {
             if (!existente.getIdMoneda().equals(id)) {
                 throw new IllegalArgumentException("Ya existe una moneda con código " + nuevoCodigo);
             }
         });
+
+        // No permitir dejar inactiva a la moneda local
+        if ((Boolean.TRUE.equals(m.getEsMonedaLocal()) || dto.esLocal())
+                && !dto.estadoActivo()) {
+            throw new IllegalArgumentException("La moneda local no puede inhabilitarse.");
+        }
+
+        // No permitir quitar el 'esLocal' si no existe otra que vaya a ser local
+        if (Boolean.TRUE.equals(m.getEsMonedaLocal()) && !dto.esLocal()) {
+            // Opciones:
+            // 1) Bloquear:
+            throw new IllegalArgumentException(
+                    "Debe existir siempre una moneda local. Asigne otra como local antes de quitar este estado."
+            );
+
+            // 2) (alternativa) O promover otra a local aquí mismo – si tienes esa UX/DTO.
+        }
 
         // Si pasa a local, desmarcar la local anterior
         if (!Boolean.TRUE.equals(m.getEsMonedaLocal()) && dto.esLocal()) {
@@ -165,7 +185,7 @@ public class MonedaServicio {
 
         Moneda saved = repo.save(m);
 
-        // --- EDITAR TIPO DE CAMBIO (upsert) si NO es local y se envió tasa ---
+        // upsert TC si NO es local y enviaron tasa
         if (!saved.getEsMonedaLocal() && dto.tasaCambioRespectoLocal() != null) {
             if (dto.tasaCambioRespectoLocal().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException("La tasa debe ser mayor a 0.");
@@ -192,19 +212,24 @@ public class MonedaServicio {
 
     public void eliminar(Long id) {
         Moneda m = repo.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Moneda no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Moneda no encontrada"));
 
         if (Boolean.TRUE.equals(m.getEsMonedaLocal())) {
-            throw new IllegalArgumentException("La moneda local no puede eliminarse.");
+            // No permitir eliminar la local
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La moneda local no puede eliminarse.");
         }
 
-        // Soft delete: inhabilitar
-        if (!m.isEstadoActivo()) return;
-        m.setEstadoActivo(false);
-        repo.save(m);
+        boolean tieneRefs = tcRepo.existsByIdMonedaOrigenOrIdMonedaDestino(id, id);
+        if (tieneRefs) {
+            // 👉 NO hagas soft delete: devolvemos 409 y el front muestra mensaje
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "No se puede eliminar la moneda porque tiene tipos de cambio asociados."
+            );
+        }
 
-        // (opcional) si quisieras borrado físico cuando no está referenciada:
-        // if (!tcRepo.existsByIdMonedaOrigenOrIdMonedaDestino(id, id)) repo.deleteById(id);
+        // Sin referencias: borrado físico
+        repo.deleteById(id);
     }
 
     public MonedaDTO cambiarEstado(Long id, boolean activo) {

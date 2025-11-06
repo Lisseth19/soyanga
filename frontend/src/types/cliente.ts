@@ -31,4 +31,4 @@ export type ClienteEditarDTO = Partial<Omit<ClienteCrearDTO, "estadoActivo">> & 
     estadoActivo?: boolean;
 };
 
-export type ClienteEstadoDTO = { estadoActivo: boolean };
+export type ClienteEstadoDTO = { activo: boolean };

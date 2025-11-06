@@ -12,12 +12,14 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/seguridad/usuarios")
 @RequiredArgsConstructor
-@PreAuthorize("@perms.tiene(authentication, 'usuarios:ver')") // lectura por defecto
 public class UsuarioControlador {
 
     private final UsuarioServicio servicio;
 
+    // ======= LECTURAS =======
+
     @GetMapping
+    @PreAuthorize("@perms.tiene(authentication, 'usuarios:ver')")
     public Page<UsuarioRespuestaDTO> listar(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "false") boolean soloActivos,
@@ -29,9 +31,12 @@ public class UsuarioControlador {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@perms.tiene(authentication, 'usuarios:ver')")
     public UsuarioRespuestaDTO obtener(@PathVariable Long id) {
         return servicio.obtener(id);
     }
+
+    // ======= CREAR/EDITAR/ELIMINAR =======
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -53,23 +58,39 @@ public class UsuarioControlador {
         servicio.eliminar(id);
     }
 
+    // ======= ACCIONES ESPECIALES (permisos granulares) =======
+
+    /**
+     * Cambiar contraseña (dos modos):
+     *  - Modo usuario: { "contrasenaActual": "...", "nuevaContrasena": "..." }
+     *  - Modo admin-reset: { "resetPorEmail": true }  -> dispara envío de enlace por email (no pide actual).
+     */
     @PutMapping("/{id}/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("@perms.tiene(authentication, 'usuarios:actualizar')")
+    @PreAuthorize("@perms.tiene(authentication, 'usuarios:cambiar-password')")
     public void cambiarPassword(@PathVariable Long id, @Valid @RequestBody UsuarioCambiarPasswordDTO dto) {
         servicio.cambiarPassword(id, dto);
     }
 
     @PutMapping("/{id}/roles")
-    @PreAuthorize("@perms.tiene(authentication, 'usuarios:actualizar')")
+    @PreAuthorize("@perms.tiene(authentication, 'usuarios:asignar-roles')")
     public UsuarioRespuestaDTO asignarRoles(@PathVariable Long id, @Valid @RequestBody UsuarioAsignarRolesDTO dto) {
         return servicio.asignarRoles(id, dto);
     }
 
     @PatchMapping("/{id}/estado")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("@perms.tiene(authentication, 'usuarios:actualizar')")
+    @PreAuthorize("@perms.tiene(authentication, 'usuarios:cambiar-estado')")
     public void cambiarEstado(@PathVariable Long id, @RequestParam boolean activo) {
         servicio.cambiarEstado(id, activo);
+    }
+
+    // ======= OPCIONAL: endpoint dedicado para reset por email =======
+    // Si prefieres separar el flujo y NO usar el flag resetPorEmail en el PUT.
+    @PostMapping("/{id}/password-reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@perms.tiene(authentication, 'usuarios:cambiar-password')")
+    public void solicitarReset(@PathVariable Long id) {
+        servicio.solicitarResetPorEmail(id);
     }
 }
