@@ -12,11 +12,11 @@ export interface SucursalCreate {
   nombreSucursal: string;
   direccion: string;
   ciudad: string;
-  /** opcional: si no lo envías, el backend lo dejará en true por defecto */
+  /** opcional: si no lo envías, el backend lo deja en true */
   estadoActivo?: boolean;
 }
 
-// Para actualizar (parcial)
+// Para actualizar (parcial o total)
 export interface SucursalUpdate {
   nombreSucursal?: string;
   direccion?: string;
@@ -25,11 +25,12 @@ export interface SucursalUpdate {
 }
 
 // Filtros de listado (query params)
+// reemplazamos 'activo' por 'incluirInactivos' para alinear con el backend
 export interface SucursalFiltro {
-  q?: string;           // búsqueda libre por nombre/dirección (si tu API lo soporta)
+  q?: string;
   ciudad?: string;
-  activo?: boolean;
-  page?: number;        // 0-based
-  size?: number;        // 10, 20, 50...
-  sort?: string;        // ej: "nombreSucursal,asc"
+  incluirInactivos?: boolean; // true = trae todos; false/undefined = solo activos
+  page?: number;              // 0-based
+  size?: number;              // 10, 20, 50...
+  sort?: string;              // ej: "nombreSucursal,asc"
 }

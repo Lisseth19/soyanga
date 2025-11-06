@@ -6,7 +6,9 @@ import com.soyanga.soyangabackend.dto.clientes.ClienteEditarDTO;
 import com.soyanga.soyangabackend.dto.clientes.ClienteRespuestaDTO;
 import com.soyanga.soyangabackend.repositorio.clientes.ClienteRepositorio;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ClienteServicio {
 
     private final ClienteRepositorio repo;
+
+    /* ==================== Mappers & helpers ==================== */
 
     private ClienteRespuestaDTO toDTO(Cliente c) {
         return ClienteRespuestaDTO.builder()
@@ -25,9 +29,7 @@ public class ClienteServicio {
                 .correoElectronico(c.getCorreoElectronico())
                 .direccion(c.getDireccion())
                 .ciudad(c.getCiudad())
-                .condicionDePago(
-                        c.getCondicionDePago() != null ? c.getCondicionDePago().name() : null
-                )
+                .condicionDePago(c.getCondicionDePago() != null ? c.getCondicionDePago().name() : null)
                 .limiteCreditoBob(c.getLimiteCreditoBob())
                 .estadoActivo(Boolean.TRUE.equals(c.getEstadoActivo()))
                 .build();
@@ -41,6 +43,8 @@ public class ClienteServicio {
             default: throw new IllegalArgumentException("condicionDePago inválida: " + s);
         }
     }
+
+    /* ==================== Consultas ==================== */
 
     @Transactional(readOnly = true)
     public Page<ClienteRespuestaDTO> listar(String q, Boolean soloActivos, Pageable pageable) {
@@ -59,6 +63,8 @@ public class ClienteServicio {
         return toDTO(c);
     }
 
+    /* ==================== Comandos ==================== */
+
     @Transactional
     public ClienteRespuestaDTO crear(ClienteCrearDTO dto) {
         if (dto.getNit() != null && !dto.getNit().isBlank()
@@ -75,8 +81,9 @@ public class ClienteServicio {
                 .ciudad(dto.getCiudad())
                 .condicionDePago(parseCondicion(dto.getCondicionDePago()))
                 .limiteCreditoBob(dto.getLimiteCreditoBob())
-                .estadoActivo(true)
+                .estadoActivo(true) // nuevo cliente activo por defecto
                 .build();
+
         c = repo.save(c);
         return toDTO(c);
     }
@@ -86,11 +93,11 @@ public class ClienteServicio {
         var c = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado: " + id));
 
+        // Unicidad de NIT
         if (dto.getNit() != null && !dto.getNit().isBlank()) {
             var nitNuevo = dto.getNit().trim();
-            // si cambió y ya existe en otro
-            if (!nitNuevo.equalsIgnoreCase(c.getNit() != null ? c.getNit() : "")
-                    && repo.existsByNitIgnoreCase(nitNuevo)) {
+            var nitActual = c.getNit() == null ? "" : c.getNit();
+            if (!nitNuevo.equalsIgnoreCase(nitActual) && repo.existsByNitIgnoreCase(nitNuevo)) {
                 throw new IllegalArgumentException("Ya existe un cliente con ese NIT");
             }
             c.setNit(nitNuevo);
@@ -103,10 +110,13 @@ public class ClienteServicio {
         c.setCorreoElectronico(dto.getCorreoElectronico());
         c.setDireccion(dto.getDireccion());
         c.setCiudad(dto.getCiudad());
+
         if (dto.getCondicionDePago() != null) {
             c.setCondicionDePago(parseCondicion(dto.getCondicionDePago()));
         }
+
         c.setLimiteCreditoBob(dto.getLimiteCreditoBob());
+
         if (dto.getEstadoActivo() != null) {
             c.setEstadoActivo(dto.getEstadoActivo());
         }
@@ -115,12 +125,38 @@ public class ClienteServicio {
         return toDTO(c);
     }
 
+    /**
+     * ELIMINACIÓN REAL (hard delete).
+     * Si el cliente está referenciado, relanzamos DataIntegrityViolationException
+     * con un mensaje claro. El handler global la convertirá en 409 CONFLICT.
+     */
     @Transactional
     public void eliminar(Long id) {
-        // Regla simple: soft delete (estado_activo = false) para no romper FK
+        if (!repo.existsById(id)) {
+            throw new IllegalArgumentException("Cliente no encontrado: " + id);
+        }
+        try {
+            repo.deleteById(id);
+            // Forzar la comprobación de FKs ahora mismo
+            repo.flush();
+        } catch (DataIntegrityViolationException ex) {
+            // Misma clase, mensaje claro para el handler
+            throw new DataIntegrityViolationException(
+                    "No se puede eliminar el cliente porque está en uso en otros registros.",
+                    ex
+            );
+        }
+    }
+
+    /**
+     * PATCH /api/v1/clientes/{id}/estado (activar / desactivar).
+     */
+    @Transactional
+    public ClienteRespuestaDTO cambiarEstado(Long id, boolean activo) {
         var c = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado: " + id));
-        c.setEstadoActivo(false);
-        repo.save(c);
+        c.setEstadoActivo(activo);
+        c = repo.save(c);
+        return toDTO(c);
     }
 }

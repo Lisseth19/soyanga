@@ -1,3 +1,4 @@
+// src/servicios/sucursal.ts
 import { http } from "./httpClient";
 import type { Page } from "@/types/pagination";
 import type {
@@ -7,12 +8,10 @@ import type {
   SucursalFiltro,
 } from "@/types/sucursal";
 
-
 export interface OpcionIdNombre {
   id: number;
   nombre: string;
 }
-
 
 const BASE = "/v1/catalogo/sucursales";
 
@@ -26,22 +25,31 @@ function toParams(obj: SucursalFiltro): Record<string, unknown> {
 }
 
 export const sucursalService = {
+  /** Listar sucursales — usa incluirInactivos como en el backend */
   list: (filtro: SucursalFiltro = {}) =>
-    http.get<Page<Sucursal>>(BASE, { params: toParams(filtro) }),
+      http.get<Page<Sucursal>>(BASE, { params: toParams(filtro) }),
 
-  get: (id: number) =>
-    http.get<Sucursal>(`${BASE}/${id}`),
+  /** Obtener una sucursal */
+  get: (id: number) => http.get<Sucursal>(`${BASE}/${id}`),
 
+  /** Crear una sucursal */
   create: (payload: SucursalCreate) =>
-    http.post<Sucursal, SucursalCreate>(BASE, payload),
+      http.post<Sucursal, SucursalCreate>(BASE, payload),
 
+  /** Actualizar (PUT) */
   update: (id: number, payload: SucursalUpdate) =>
-    http.put<Sucursal, SucursalUpdate>(`${BASE}/${id}`, payload),
+      http.put<Sucursal, SucursalUpdate>(`${BASE}/${id}`, payload),
 
-  remove: (id: number) =>
-    http.del<void>(`${BASE}/${id}`),
+  /** Eliminar (DELETE) */
+  remove: (id: number) => http.del<void>(`${BASE}/${id}`),
 
-   // ⬇️ NUEVO: opciones para combos (id + nombre)
-  opciones: () =>
-    http.get<OpcionIdNombre[]>(`${BASE}/opciones`),
+  /** Cambiar estado (PATCH /{id}/estado con body { activo }) */
+  toggleActivo: (id: number, activo: boolean) =>
+      http.patch<void, { activo: boolean }>(`${BASE}/${id}/estado`, { activo }),
+
+  /** Opciones para combos (acepta incluirInactivos si lo necesitas) */
+  opciones: (incluirInactivos?: boolean) =>
+      http.get<OpcionIdNombre[]>(`${BASE}/opciones`, {
+        params: incluirInactivos === undefined ? undefined : { incluirInactivos },
+      }),
 };

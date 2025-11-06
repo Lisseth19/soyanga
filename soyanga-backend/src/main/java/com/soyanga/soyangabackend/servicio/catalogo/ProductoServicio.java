@@ -3,6 +3,7 @@ package com.soyanga.soyangabackend.servicio.catalogo;
 import com.soyanga.soyangabackend.dominio.Producto;
 import com.soyanga.soyangabackend.dto.catalogo.*;
 import com.soyanga.soyangabackend.repositorio.catalogo.ProductoRepositorio;
+import com.soyanga.soyangabackend.repositorio.catalogo.PresentacionProductoRepositorio; // 👈 nuevo
 import lombok.RequiredArgsConstructor;
 
 import java.util.Locale;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductoServicio {
 
     private final ProductoRepositorio productoRepositorio;
+    private final PresentacionProductoRepositorio presentacionRepositorio; // 👈 inyectado
 
     // Construye el patrón "%q%" en minúsculas y lo pasa como :pat
     public Page<ProductoDTO> buscar(String q, Long idCategoria, boolean soloActivos, Pageable pageable) {
@@ -74,12 +76,27 @@ public class ProductoServicio {
         return toDTO(p);
     }
 
+    /** Desactiva siempre, aunque tenga presentaciones */
     @Transactional
     public void desactivar(Long id) {
         var p = productoRepositorio.findById(id)
                 .orElseThrow(() -> new IllegalStateException("Producto no encontrado: " + id));
         p.setEstadoActivo(false);
         productoRepositorio.save(p);
+    }
+
+    /** Elimina solo si NO tiene presentaciones */
+    @Transactional
+    public void eliminar(Long id) {
+        var p = productoRepositorio.findById(id)
+                .orElseThrow(() -> new IllegalStateException("Producto no encontrado: " + id));
+
+        long n = presentacionRepositorio.countByIdProducto(id);
+        if (n > 0) {
+            // Sugerencia: mapea este mensaje a 409 CONFLICT en tu @ControllerAdvice
+            throw new IllegalStateException("No se puede eliminar el producto porque tiene presentaciones.");
+        }
+        productoRepositorio.delete(p);
     }
 
     // --- mapeos ---

@@ -1,21 +1,25 @@
 package com.soyanga.soyangabackend.web.seguridad;
 
 import com.soyanga.soyangabackend.dto.seguridad.*;
+import com.soyanga.soyangabackend.seguridad.Perms;
 import com.soyanga.soyangabackend.servicio.seguridad.PermisoServicio;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/seguridad/permisos")
 @RequiredArgsConstructor
-@PreAuthorize("@perms.tiene(authentication, 'permisos:ver')") // todos los GET requieren permisos:ver
+@PreAuthorize("@perms.tiene(authentication, 'permisos:ver')") // lectura por defecto
 public class PermisoControlador {
 
     private final PermisoServicio servicio;
+    private final Perms perms; // para validación fina en runtime
 
     @GetMapping
     public Page<PermisoRespuestaDTO> listar(
@@ -56,24 +60,36 @@ public class PermisoControlador {
         servicio.eliminar(id);
     }
 
-    /** Activar/Desactivar con un solo endpoint */
+    /* ================== Estado (tres variantes) ================== */
+
+    /** Variante conveniente (booleana) con chequeo fino por intención */
     @PatchMapping("/{id}/estado")
-    @PreAuthorize("@perms.tiene(authentication, 'permisos:actualizar')")
-    public PermisoRespuestaDTO cambiarEstado(@PathVariable Long id, @RequestBody CambiarEstadoReq req) {
-        return servicio.cambiarEstado(id, req.activo());
+    @PreAuthorize("@perms.tiene(authentication, 'permisos:activar') or @perms.tiene(authentication, 'permisos:desactivar')")
+    public PermisoRespuestaDTO cambiarEstado(
+            @PathVariable Long id,
+            @RequestBody CambiarEstadoReq req,
+            Authentication auth
+    ) {
+        boolean activar = req.activo();
+        if (activar && !perms.tiene(auth, "permisos:activar")) {
+            throw new AccessDeniedException("No tienes permiso para activar permisos");
+        }
+        if (!activar && !perms.tiene(auth, "permisos:desactivar")) {
+            throw new AccessDeniedException("No tienes permiso para desactivar permisos");
+        }
+        return servicio.cambiarEstado(id, activar);
     }
 
-    /** Compatibilidad hacia atrás (deprecados) */
-    @Deprecated
+    /** Activar explícito (permiso fino) */
     @PatchMapping("/{id}/activar")
-    @PreAuthorize("@perms.tiene(authentication, 'permisos:actualizar')")
+    @PreAuthorize("@perms.tiene(authentication, 'permisos:activar')")
     public PermisoRespuestaDTO activar(@PathVariable Long id) {
         return servicio.cambiarEstado(id, true);
     }
 
-    @Deprecated
+    /** Desactivar explícito (permiso fino) */
     @PatchMapping("/{id}/desactivar")
-    @PreAuthorize("@perms.tiene(authentication, 'permisos:actualizar')")
+    @PreAuthorize("@perms.tiene(authentication, 'permisos:desactivar')")
     public PermisoRespuestaDTO desactivar(@PathVariable Long id) {
         return servicio.cambiarEstado(id, false);
     }

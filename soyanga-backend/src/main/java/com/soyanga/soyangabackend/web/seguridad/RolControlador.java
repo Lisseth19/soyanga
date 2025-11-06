@@ -9,17 +9,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/seguridad/roles")
 @RequiredArgsConstructor
-@PreAuthorize("@perms.tiene(authentication, 'roles:ver')") // lectura del recurso
 public class RolControlador {
 
     private final RolServicio servicio;
 
+    // ===== LECTURA =====
     @GetMapping
+    @PreAuthorize("@perms.tiene(authentication, 'roles:ver')")
     public Page<RolRespuestaDTO> listar(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
@@ -29,10 +28,12 @@ public class RolControlador {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@perms.tiene(authentication, 'roles:ver')")
     public RolRespuestaDTO obtener(@PathVariable Long id) {
         return servicio.obtener(id);
     }
 
+    // ===== CRUD =====
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@perms.tiene(authentication, 'roles:crear')")
@@ -53,21 +54,21 @@ public class RolControlador {
         servicio.eliminar(id);
     }
 
-    //  GET permisos del rol
+    // ===== ACCIONES ESPECIALES =====
     @GetMapping("/{id}/permisos")
-    public List<PermisoRespuestaDTO> listarPermisos(@PathVariable Long id) {
+    @PreAuthorize("@perms.tiene(authentication, 'roles:ver')")
+    public java.util.List<PermisoRespuestaDTO> listarPermisos(@PathVariable Long id) {
         return servicio.listarPermisosDelRol(id);
     }
 
     @PatchMapping("/{id}/estado")
-    @PreAuthorize("@perms.tiene(authentication, 'roles:actualizar')")
+    @PreAuthorize("@perms.tiene(authentication, 'roles:cambiar-estado')")
     public RolRespuestaDTO cambiarEstado(@PathVariable Long id, @Valid @RequestBody RolEstadoDTO dto) {
         return servicio.cambiarEstado(id, dto);
     }
 
-    // Reemplazo total de permisos del rol
     @PutMapping("/{id}/permisos")
-    @PreAuthorize("@perms.tiene(authentication, 'roles:actualizar')")
+    @PreAuthorize("@perms.tiene(authentication, 'roles:asignar-permisos')")
     public RolRespuestaDTO asignarPermisos(@PathVariable Long id, @Valid @RequestBody RolAsignarPermisosDTO dto) {
         return servicio.asignarPermisos(id, dto);
     }
