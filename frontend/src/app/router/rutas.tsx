@@ -8,6 +8,7 @@ import PublicLayout from "../layout/PublicLayout";
 import SettingsLayout from "../layout/SettingsLayout";
 import ComprasLayout from "../layout/ComprasLayout";
 import SeguridadLayout from "../layout/SeguridadLayout";
+import InventarioLayout from "../layout/InventarioLayout";
 
 // Auth
 import RequireAuth from "@/componentes/RequireAuth";
@@ -22,10 +23,15 @@ import ContactoPublico from "@/paginas/publico/Contacto";
 import CartPage from "@/paginas/publico/Cotizacion";
 import MetodosPagoPage from "@/paginas/publico/MetodosPago";
 
-// Páginas privadas
+// Páginas privadas (dashboard)
 import Inicio from "@/paginas/Inicio";
 import SaludAPI from "@/paginas/Health";
+
+// Inventario
 import InventarioPorLotePage from "@/paginas/inventario/InventarioPorLote";
+import AjustesInventarioPage from "@/paginas/inventario/AjustesInventario";
+import MovimientosEntreAlmacenesPage from "@/paginas/inventario/MovimientosEntreAlmacenes";
+import AlertasInventarioPage from "@/paginas/inventario/AlertasInventario";
 
 // Estructura / Finanzas
 import SucursalesList from "@/paginas/sucursales/SucursalesList";
@@ -88,7 +94,7 @@ export const router = createBrowserRouter([
   { path: "/login", element: <Navigate to="/soyanga/login" replace /> },
 
   // ============================
-  // BLOQUE AUTH MINIMAL
+  // BLOQUE AUTH MINIMAL (ej. reset password)
   // ============================
   {
     element: <AuthMinimalLayout />,
@@ -101,9 +107,9 @@ export const router = createBrowserRouter([
   // ============================
   {
     element: (
-        <RequireAuth>
-          <AppLayout />
-        </RequireAuth>
+      <RequireAuth>
+        <AppLayout />
+      </RequireAuth>
     ),
     children: [
       { path: "/inicio", element: <Inicio /> },
@@ -145,7 +151,7 @@ export const router = createBrowserRouter([
         path: "/compras",
         element: <ComprasLayout />,
         children: [
-          { index: true, element: <ComprasListaPage /> }, // landing del módulo
+          { index: true, element: <ComprasListaPage /> }, // Landing del módulo
           // Proveedores
           { path: "proveedores", element: <ProveedoresPage /> },
           // Pedidos
@@ -165,7 +171,7 @@ export const router = createBrowserRouter([
         path: "/seguridad",
         element: <SeguridadLayout />,
         children: [
-          { index: true, element: <UsuariosPage /> }, // el layout ya redirige inteligentemente por permisos
+          { index: true, element: <UsuariosPage /> }, // el layout puede redirigir según permisos
           { path: "usuarios", element: <UsuariosPage /> },
           { path: "roles", element: <RolesPage /> },
           { path: "permisos", element: <PermisosPage /> },
@@ -173,7 +179,19 @@ export const router = createBrowserRouter([
         ],
       },
 
-      // Inventario
+      // === Inventario (módulo nuevo con subrutas) ===
+      {
+        path: "/inventario",
+        element: <InventarioLayout />,
+        children: [
+          { index: true, element: <Navigate to="ajustes" replace /> },
+          { path: "ajustes", element: <AjustesInventarioPage /> },
+          { path: "movimientos", element: <MovimientosEntreAlmacenesPage /> },
+          { path: "alertas", element: <AlertasInventarioPage /> },
+        ],
+      },
+
+      // Inventario por lote (ruta directa que ya usas en el layout)
       { path: "/inventario/por-lote", element: <InventarioPorLotePage /> },
 
       // Sucursales (atajos fuera de /config si los usas en la UI)
@@ -189,6 +207,6 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Catch-all GLOBAL → homepage pública
+  // Catch-all GLOBAL → homepage pública (asegura que / caiga en público)
   { path: "*", element: <Navigate to="/soyanga/inicio" replace /> },
 ]);

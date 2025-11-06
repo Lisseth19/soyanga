@@ -28,6 +28,7 @@ public class GlobalExceptionHandler {
         private final String path;
         private final String timestamp;
         private final Map<String, Object> errors;
+
         ApiError(HttpStatus status, String message, String path, Map<String, Object> errors) {
             this.status = status.value();
             this.error = status.getReasonPhrase();
@@ -36,6 +37,7 @@ public class GlobalExceptionHandler {
             this.timestamp = OffsetDateTime.now().toString();
             this.errors = errors;
         }
+
         public int getStatus() { return status; }
         public String getError() { return error; }
         public String getMessage() { return message; }
@@ -68,7 +70,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidacion(MethodArgumentNotValidException ex, HttpServletRequest req) {
-        Map<String,Object> errs = new LinkedHashMap<>();
+        Map<String, Object> errs = new LinkedHashMap<>();
         for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
             errs.put(fe.getField(), fe.getDefaultMessage());
         }
@@ -79,11 +81,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
         var msg = "Parámetro inválido: " + ex.getName();
-        var body = new ApiError(HttpStatus.BAD_REQUEST, msg, req.getRequestURI(), Map.of(
+        var body = new ApiError(
+            HttpStatus.BAD_REQUEST,
+            msg,
+            req.getRequestURI(),
+            Map.of(
                 "param", ex.getName(),
                 "value", String.valueOf(ex.getValue()),
                 "requiredType", ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"
-        ));
+            )
+        );
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -95,7 +102,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiError> handleJakartaConstraint(ConstraintViolationException ex, HttpServletRequest req) {
-        Map<String,Object> errs = new LinkedHashMap<>();
+        Map<String, Object> errs = new LinkedHashMap<>();
         ex.getConstraintViolations().forEach(cv -> errs.put(cv.getPropertyPath().toString(), cv.getMessage()));
         var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricciones", req.getRequestURI(), errs);
         return ResponseEntity.badRequest().body(body);
@@ -112,9 +119,9 @@ public class GlobalExceptionHandler {
         String constraintName = info.constraintName;
         String raw = info.rawMessage;
 
-        // ⚠️ Agregamos lectura del mensaje humano del servicio
+        // Mensajes del servicio (si ya dio uno humano)
         String custom = ex.getMessage() != null ? ex.getMessage() : "";
-        String low = ((raw != null ? raw : "") + " " + custom).toLowerCase();
+        String low = ((raw != null ? raw : "") + " " + custom).toLowerCase(Locale.ROOT);
 
         // Postgres
         boolean isPgForeignKey = "23503".equals(sqlState);
@@ -134,8 +141,13 @@ public class GlobalExceptionHandler {
         Map<String,Object> extra = new LinkedHashMap<>();
         if (constraintName != null) extra.put("constraint", constraintName);
 
-        // ✅ PRIORIDAD: si el servicio ya dio un mensaje humano claro para CLIENTES, úsalo tal cual.
-        if (custom.toLowerCase().contains("no se puede eliminar el cliente")) {
+        // ✅ Prioridad: si el servicio ya dio un mensaje humano claro, úsalo tal cual (ej. clientes)
+        if (custom.toLowerCase(Locale.ROOT).contains("no se puede eliminar el cliente")) {
+            var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty()? null: extra);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+        // (opcional) otros mensajes específicos del servicio
+        if (custom.toLowerCase(Locale.ROOT).contains("no se puede eliminar el proveedor")) {
             var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty()? null: extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
@@ -145,7 +157,7 @@ public class GlobalExceptionHandler {
             String friendly = "No se puede completar la operación porque el registro está en uso por otros recursos.";
             // Personalización por constraint: ejemplo unidades/presentaciones
             if (constraintName != null) {
-                String c = constraintName.toLowerCase();
+                String c = constraintName.toLowerCase(Locale.ROOT);
                 if (c.contains("present") && c.contains("unidad")) {
                     friendly = "No se puede eliminar la unidad porque está en uso por presentaciones.";
                 }
@@ -160,7 +172,7 @@ public class GlobalExceptionHandler {
         if (isPgUnique || isMyUnique || msgUnique) {
             String friendly = "Registro duplicado.";
             if (constraintName != null) {
-                String c = constraintName.toLowerCase();
+                String c = constraintName.toLowerCase(Locale.ROOT);
                 if (c.contains("uk_unidad_simbolo") || (c.contains("uniq") && c.contains("simbolo"))) {
                     friendly = "Ya existe una unidad con ese símbolo.";
                 } else if (c.contains("uk_unidad_nombre") || (c.contains("uniq") && c.contains("nombre"))) {
@@ -184,9 +196,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    // (opcional) Si Hibernate deja pasar su ConstraintViolationException sin envolver
+    // (si Hibernate deja pasar su ConstraintViolationException sin envolver)
     @ExceptionHandler(org.hibernate.exception.ConstraintViolationException.class)
-    public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex, HttpServletRequest req) {
+    public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex,
+                                                              HttpServletRequest req) {
         String constraintName = ex.getConstraintName();
         String sqlState = null;
         Integer vendorCode = null;
@@ -199,10 +212,14 @@ public class GlobalExceptionHandler {
 
         boolean isPgForeignKey = "23503".equals(sqlState);
         boolean isPgUnique     = "23505".equals(sqlState);
+
         if (isPgForeignKey) {
             String msg = "No se puede completar la operación porque el registro está en uso por otros recursos.";
-            if (constraintName != null && constraintName.toLowerCase().contains("present") && constraintName.toLowerCase().contains("unidad")) {
-                msg = "No se puede eliminar la unidad porque está en uso por presentaciones.";
+            if (constraintName != null) {
+                String c = constraintName.toLowerCase(Locale.ROOT);
+                if (c.contains("present") && c.contains("unidad")) {
+                    msg = "No se puede eliminar la unidad porque está en uso por presentaciones.";
+                }
             }
             var body = new ApiError(HttpStatus.CONFLICT, msg, req.getRequestURI(), extra.isEmpty()? null: extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
@@ -211,6 +228,7 @@ public class GlobalExceptionHandler {
             var body = new ApiError(HttpStatus.CONFLICT, "Registro duplicado.", req.getRequestURI(), extra.isEmpty()? null: extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
+
         var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos", req.getRequestURI(), extra.isEmpty()? null: extra);
         return ResponseEntity.badRequest().body(body);
     }
@@ -244,7 +262,6 @@ public class GlobalExceptionHandler {
         String constraint = null;
         String raw = ex.getMessage();
 
-        // Hibernate CVE trae el nombre de la constraint
         if (ex instanceof org.hibernate.exception.ConstraintViolationException hce) {
             constraint = hce.getConstraintName();
             if (hce.getCause() instanceof SQLException sql) {
