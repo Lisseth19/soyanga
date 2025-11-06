@@ -84,6 +84,10 @@ import InventarioLayout from "../layout/InventarioLayout";
 import MovimientosEntreAlmacenesPage from "@/paginas/inventario/MovimientosEntreAlmacenes";
 import AlertasInventarioPage from "@/paginas/inventario/AlertasInventario";
 
+//precios
+import ReglasDePrecios from "@/paginas/finanzas/ReglasDePrecios";
+import HistorialPrecios from "@/paginas/finanzas/HistorialPrecios";
+
 export const router = createBrowserRouter([
   // ============================
   // BLOQUE PÚBLICO (NO requiere auth)
@@ -129,6 +133,8 @@ export const router = createBrowserRouter([
           { path: "estructura/almacenes", element: <AlmacenesPage /> },
           { path: "finanzas/monedas", element: <MonedasPage /> },
           { path: "finanzas/tipos-cambio", element: <TiposCambioPage /> },
+          { path: "finanzas/reglas-precios", element: <ReglasDePrecios />},
+          { path: "finanzas/historial-precios", element: <HistorialPrecios /> },
         ],
       },
       {

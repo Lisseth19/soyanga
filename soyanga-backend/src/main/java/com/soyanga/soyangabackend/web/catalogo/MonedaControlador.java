@@ -28,8 +28,7 @@ public class MonedaControlador {
     public Page<MonedaDTO> listar(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Boolean activos,
-            @PageableDefault(size = 20, sort = "nombreMoneda") Pageable pageable
-    ) {
+            @PageableDefault(size = 20, sort = "nombreMoneda") Pageable pageable) {
         return servicio.listar(q, activos, pageable);
     }
 
@@ -37,8 +36,7 @@ public class MonedaControlador {
     @GetMapping("/no-locales")
     public List<MonedaDTO> listarNoLocalesConTC(
             @RequestParam(required = false) Boolean activos,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha
-    ) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         return servicio.listarNoLocalesConTC(activos, fecha);
     }
 

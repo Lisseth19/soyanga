@@ -76,6 +76,12 @@ export default function SettingsLayout() {
               <NavLink to="/config/finanzas/tipos-cambio" className={itemClass}>
                 <Coins size={16}/> Tipos de Cambio
               </NavLink>
+              <NavLink to="/config/finanzas/historial-precios" className={itemClass}>
+                <Coins size={16}/> Historial de precios
+              </NavLink>
+              <NavLink to="/config/finanzas/reglas-precios" className={itemClass}>
+                <Coins size={16}/> Reglas de Precios
+              </NavLink>
             </nav>
 
             {/* ====== CATÁLOGO ====== */}

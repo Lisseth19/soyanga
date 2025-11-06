@@ -170,6 +170,8 @@ export default function AppLayout() {
     can("almacenes:ver") ||
     can("monedas:ver") ||
     can("tipos-cambio:ver") ||
+    can("historial-precios:ver") ||
+    can("reglas-precios:ver") ||
     can("categorias:ver") ||
     can("productos:ver") ||
     can("unidades:ver") ||

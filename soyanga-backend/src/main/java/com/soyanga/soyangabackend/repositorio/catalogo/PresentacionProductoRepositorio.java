@@ -2,8 +2,15 @@ package com.soyanga.soyangabackend.repositorio.catalogo;
 
 import com.soyanga.soyangabackend.dominio.PresentacionProducto;
 import com.soyanga.soyangabackend.repositorio.BaseRepository;
+
+import jakarta.persistence.LockModeType;
+
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,5 +34,12 @@ public interface PresentacionProductoRepositorio extends BaseRepository<Presenta
       @Param("pattern") String pattern,
       @Param("estadoActivo") Boolean estadoActivo,
       Pageable pageable);
+
+  @Query("select p from PresentacionProducto p where p.estadoActivo = true")
+  List<PresentacionProducto> findActivas();
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select p from PresentacionProducto p where p.idPresentacion = :id")
+  Optional<PresentacionProducto> lockById(@Param("id") Long idPresentacion);
 
 }
