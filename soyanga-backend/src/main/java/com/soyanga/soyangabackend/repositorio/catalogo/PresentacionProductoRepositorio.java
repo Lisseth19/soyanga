@@ -14,9 +14,19 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Optional;
+
 public interface PresentacionProductoRepositorio extends BaseRepository<PresentacionProducto, Long> {
 
-  java.util.Optional<PresentacionProducto> findByCodigoSku(String codigoSku);
+  Optional<PresentacionProducto> findByCodigoSku(String codigoSku);
+
+  /** Para validar eliminación de producto (hard delete) */
+  long countByIdProducto(Long idProducto);
+  boolean existsByIdProducto(Long idProducto);
+
+  /** Útiles si quieres validar/mostrar solo presentaciones activas */
+  long countByIdProductoAndEstadoActivoTrue(Long idProducto);
+  boolean existsByIdProductoAndEstadoActivoTrue(Long idProducto);
 
   @Query("""
       SELECT p
@@ -31,6 +41,7 @@ public interface PresentacionProductoRepositorio extends BaseRepository<Presenta
         )
       """)
   Page<PresentacionProducto> buscar(@Param("idProducto") Long idProducto,
+
       @Param("pattern") String pattern,
       @Param("estadoActivo") Boolean estadoActivo,
       Pageable pageable);
@@ -41,5 +52,6 @@ public interface PresentacionProductoRepositorio extends BaseRepository<Presenta
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select p from PresentacionProducto p where p.idPresentacion = :id")
   Optional<PresentacionProducto> lockById(@Param("id") Long idPresentacion);
+
 
 }

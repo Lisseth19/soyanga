@@ -5,8 +5,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -16,6 +18,7 @@ public class UsuarioDetallesService implements UserDetailsService {
     private final UsuarioRepositorio usuarioRepo;
 
     @Override
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
         final var key = usernameOrEmail == null ? "" : usernameOrEmail.trim();
 
@@ -23,42 +26,44 @@ public class UsuarioDetallesService implements UserDetailsService {
                 .or(() -> usuarioRepo.findByCorreoElectronicoIgnoreCase(key))
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado"));
 
-        if (Boolean.FALSE.equals(user.getEstadoActivo())) {
-            throw new UsernameNotFoundException("Usuario inactivo");
-        }
+        final boolean enabled = Boolean.TRUE.equals(user.getEstadoActivo());
 
-        // IMPORTANTE: asegúrate que estos métodos ya filtran por roles/permisos activos en DB
-        var roles = usuarioRepo.rolesDeUsuario(user.getIdUsuario());       // p.ej. ["ADMIN","VENTAS"]
-        var permisos = usuarioRepo.permisosDeUsuario(user.getIdUsuario()); // p.ej. ["permisos:read","roles:write",...]
+        // IMPORTANTE: que rolesDeUsuario / permisosDeUsuario ya excluyan lo que esté deshabilitado a nivel BD
+        var roles = usuarioRepo.rolesDeUsuario(user.getIdUsuario());        // p.ej. ["ADMIN","VENTAS"]
+        var permisos = usuarioRepo.permisosDeUsuario(user.getIdUsuario());  // p.ej. ["usuarios:ver","usuarios:cambiar-password",...]
 
-        // Evita duplicados y nulls
         Set<SimpleGrantedAuthority> authorities = new LinkedHashSet<>();
 
-        // Si usas hasRole("...") en algún lugar, mantén roles:
-        for (String r : roles) {
-            if (r == null || r.isBlank()) continue;
-            var roleName = r.trim();
-            // añade prefijo ROLE_ solo si no está
-            if (!roleName.startsWith("ROLE_")) {
-                roleName = "ROLE_" + roleName.toUpperCase();
+        // Roles -> ROLE_*
+        if (roles != null) {
+            for (String r : roles) {
+                if (r == null || r.isBlank()) continue;
+                String roleName = r.trim();
+                if (!roleName.startsWith("ROLE_")) {
+                    roleName = "ROLE_" + roleName.toUpperCase();
+                }
+                authorities.add(new SimpleGrantedAuthority(roleName));
             }
-            authorities.add(new SimpleGrantedAuthority(roleName));
         }
 
-        // Permisos tal cual los definiste en la tabla (deben coincidir EXACTO con hasAuthority("..."))
-        for (String p : permisos) {
-            if (p == null || p.isBlank()) continue;
-            authorities.add(new SimpleGrantedAuthority(p.trim()));
+        // Permisos tal cual
+        if (permisos != null) {
+            for (String p : permisos) {
+                if (p == null || p.isBlank()) continue;
+                authorities.add(new SimpleGrantedAuthority(p.trim()));
+            }
         }
 
-        // Elige un identificador estable para el username del UserDetails (debe coincidir con el 'sub' del JWT)
-        final String principalUsername = user.getNombreUsuario(); // recomendado: siempre nombre de usuario
+        // El principal debe ser el nombre de usuario (coincide con lo que usa tu getCurrentUserId())
+        final String principalUsername = Objects.requireNonNullElse(user.getNombreUsuario(), "").trim();
 
         return User.withUsername(principalUsername)
                 .password(user.getContrasenaHash())
                 .authorities(authorities)
-                .accountLocked(false).accountExpired(false)
-                .credentialsExpired(false).disabled(false)
+                .accountLocked(false)
+                .accountExpired(false)
+                .credentialsExpired(false)
+                .disabled(!enabled) // << clave: en vez de lanzar excepción, dejamos disabled si corresponde
                 .build();
     }
 }

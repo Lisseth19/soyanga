@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/impuestos")
+@RequestMapping("/api/v1/precios/impuestos")
 @RequiredArgsConstructor
 public class ImpuestoControlador {
 

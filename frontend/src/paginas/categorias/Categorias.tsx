@@ -1,105 +1,342 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { categoriaService } from "@/servicios/categoria";
 import type { Categoria, CategoriaCrearDTO } from "@/types/categoria";
 import { Paginacion } from "@/componentes/Paginacion";
 import CategoriaModal from "@/componentes/ui/CategoriaModal";
-import { Pencil, Trash2 } from "lucide-react"; // ← íconos
+import { Pencil, Trash2, X } from "lucide-react";
 import { ApiError } from "@/servicios/httpClient";
+import { useAuth } from "@/context/AuthContext";
+
+/* ========= Botón de acción con icono (igual estilo que en Clientes/Product) ========= */
+function IconBtn(props: {
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+  disabled?: boolean;
+}) {
+  const { title, onClick, children, className = "", disabled } = props;
+  return (
+      <button
+          type="button"
+          title={title}
+          aria-label={title}
+          onClick={onClick}
+          disabled={disabled}
+          className={[
+            "p-1.5 rounded-md border border-transparent",
+            "hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900",
+            "disabled:opacity-50 disabled:pointer-events-none",
+            className,
+          ].join(" ")}
+      >
+        {children}
+      </button>
+  );
+}
+
+/* ========= Modal de confirmación bonito (mismo patrón que Clientes) ========= */
+function ConfirmModal({
+                        open,
+                        title,
+                        message,
+                        confirmLabel = "Confirmar",
+                        cancelLabel = "Cancelar",
+                        kind = "danger",
+                        loading = false,
+                        onConfirm,
+                        onClose,
+                      }: {
+  open: boolean;
+  title: string;
+  message: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  kind?: "default" | "danger" | "warn";
+  loading?: boolean;
+  onConfirm: () => void | Promise<void>;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+  return (
+      <div className="fixed inset-0 z-[90]">
+        <div
+            className="absolute inset-0 bg-black/35"
+            onClick={() => !loading && onClose()}
+        />
+        <div className="absolute inset-0 flex items-center justify-center p-3">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-neutral-200 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-neutral-800">{title}</h3>
+              <button
+                  type="button"
+                  className="p-1.5 rounded hover:bg-neutral-100 text-neutral-500"
+                  onClick={onClose}
+                  disabled={loading}
+                  aria-label="Cerrar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-4 py-4 text-[14px] text-neutral-700 leading-relaxed">
+              {message}
+            </div>
+            <div className="px-4 py-3 border-t border-neutral-200 flex items-center justify-end gap-2">
+              <button
+                  type="button"
+                  className="px-3 h-9 rounded-md border bg-white hover:bg-neutral-50 text-neutral-700 disabled:opacity-60"
+                  onClick={onClose}
+                  disabled={loading}
+              >
+                {cancelLabel}
+              </button>
+              <button
+                  type="button"
+                  className={[
+                    "px-3 h-9 rounded-md font-medium text-white disabled:opacity-60",
+                    kind === "danger"
+                        ? "bg-rose-600 hover:bg-rose-700"
+                        : kind === "warn"
+                            ? "bg-amber-600 hover:bg-amber-700"
+                            : "bg-emerald-600 hover:bg-emerald-700",
+                  ].join(" ")}
+                  onClick={onConfirm}
+                  disabled={loading}
+              >
+                {loading ? "Procesando…" : confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
+}
 
 export default function Categorias() {
+  const { can } = useAuth() as { can: (perm: string) => boolean };
+
+  // ===== permisos =====
+  const canVer = useMemo(() => can("categorias:ver"), [can]);
+  const canCrear = useMemo(() => can("categorias:crear"), [can]);
+  const canEditar = useMemo(() => can("categorias:actualizar"), [can]);
+  const canEliminar = useMemo(() => can("categorias:eliminar"), [can]);
+
+  // modal global de acceso denegado
+  const show403 = (msg = "No tienes permiso para realizar esta acción.") => {
+    window.dispatchEvent(
+        new CustomEvent("auth:forbidden", {
+          detail: { source: "CategoriasPage", message: msg },
+        }),
+    );
+  };
+
   // filtros
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [soloRaices, setSoloRaices] = useState(false);
+
+  // paginación
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
 
   // datos
   const [rows, setRows] = useState<Categoria[]>([]);
   const [total, setTotal] = useState(0);
-  const totalPages = useMemo(() => Math.ceil(total / size), [total, size]);
+  const totalPages = useMemo(
+      () => Math.ceil((total || 0) / (size || 20)) || 1,
+      [total, size],
+  );
+
+  // estado UI
   const [loading, setLoading] = useState(false);
-  // ↓ NUEVO: opciones simples para mapear id → nombre
-  const [catOpts, setCatOpts] = useState<Array<{ id: number; nombre: string }>>([]);
+  const [err, setErr] = useState<string | null>(null);
 
+  // opciones padre
+  const [catOpts, setCatOpts] = useState<Array<{ id: number; nombre: string }>>(
+      [],
+  );
 
-  // modales
+  // modales crear / editar
   const [showNew, setShowNew] = useState(false);
   const [editRow, setEditRow] = useState<Categoria | null>(null);
 
-  // carga
+  // modal confirmar eliminar
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmRow, setConfirmRow] = useState<Categoria | null>(null);
+
+  // debounce búsqueda
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQ(q.trim());
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  // cargar lista
   const cargar = async () => {
+    if (!canVer) {
+      show403("No tienes permiso para ver categorías.");
+      setErr("Acceso denegado.");
+      setRows([]);
+      setTotal(0);
+      return;
+    }
+
     setLoading(true);
+    setErr(null);
+
     try {
       const res = await categoriaService.list({
-        q: q || undefined,
+        q: debouncedQ || undefined,
         soloRaices: soloRaices || undefined,
         page,
         size,
         sort: "nombreCategoria,asc",
       });
-      setRows(res.content);
-      setTotal(res.totalElements);
+
+      setRows(res.content ?? []);
+      setTotal(res.totalElements ?? res.content?.length ?? 0);
+    } catch (e: any) {
+      if (e?.status === 403) {
+        show403("No tienes permiso para ver categorías.");
+        setErr("Acceso denegado.");
+      } else {
+        setErr(e?.message ?? "Error al listar categorías");
+      }
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [q, soloRaices, page, size]);
 
-  // ↓ NUEVO: carga de opciones {id, nombre} para mostrar el nombre del padre
+  useEffect(() => {
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQ, soloRaices, page, size, canVer]);
+
+  // cargar opciones padre
   const cargarOpciones = async () => {
     try {
       const opts = await categoriaService.options({});
-      setCatOpts(opts);
+      setCatOpts(opts ?? []);
     } catch {
       setCatOpts([]);
     }
   };
-  useEffect(() => { cargarOpciones(); }, []);
+  useEffect(() => {
+    cargarOpciones();
+  }, []);
 
-  // ↓ NUEVO: mapa para resolver rápido el nombre del padre
   const parentNameMap = useMemo(() => {
     const m = new Map<number, string>();
     for (const o of catOpts) m.set(o.id, o.nombre);
     return m;
   }, [catOpts]);
 
+  // ===== Helpers =====
+  const textoPadre = (c: Categoria) => {
+    const idPadre = c.idCategoriaPadre;
+    if (!idPadre) return "—";
+    return parentNameMap.get(idPadre) ?? String(idPadre);
+  };
 
-  // acciones CRUD
+  // ===== Crear =====
   const onCrear = async (payload: CategoriaCrearDTO) => {
-    await categoriaService.create(payload);
-    setPage(0);
-    await cargar();
-    await cargarOpciones();
-  };
-
-  const onEditar = async (id: number, payload: CategoriaCrearDTO) => {
-    await categoriaService.update(id, payload);
-    await cargar();
-    await cargarOpciones();
-  };
-
-  const onEliminar = async (id: number) => {
-    if (!confirm("¿Eliminar esta categoría?")) return;
-
+    if (!canCrear) {
+      show403();
+      return;
+    }
     try {
-      await categoriaService.remove(id);
-      await cargar();
-      await cargarOpciones();
+      setLoading(true);
+      setErr(null);
+      await categoriaService.create(payload);
+      setShowNew(false);
+      setPage(0);
+      await Promise.all([cargar(), cargarOpciones()]);
     } catch (e: any) {
-      // Intenta usar el mensaje del backend; si no, mapea por código
-      let msg = "No se pudo eliminar la categoría.";
+      if (e?.status === 403) {
+        show403();
+        return;
+      }
+      setErr(e?.message ?? "No se pudo crear la categoría.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // ===== Editar =====
+  const onEditar = async (id: number, payload: CategoriaCrearDTO) => {
+    if (!canEditar) {
+      show403();
+      return;
+    }
+    try {
+      setLoading(true);
+      setErr(null);
+      await categoriaService.update(id, payload);
+      setEditRow(null);
+      await Promise.all([cargar(), cargarOpciones()]);
+    } catch (e: any) {
+      if (e?.status === 403) {
+        show403();
+        return;
+      }
+      setErr(e?.message ?? "No se pudo actualizar la categoría.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===== Eliminar (ConfirmModal bonito) =====
+  function askEliminar(row: Categoria) {
+    if (!canEliminar) {
+      show403();
+      return;
+    }
+    setConfirmRow(row);
+    setConfirmOpen(true);
+  }
+
+  async function doEliminar() {
+    const row = confirmRow!;
+    setConfirmBusy(true);
+    try {
+      setLoading(true);
+      setErr(null);
+
+      await categoriaService.remove(row.idCategoria);
+
+      setConfirmOpen(false);
+      setConfirmRow(null);
+
+      await Promise.all([cargar(), cargarOpciones()]);
+    } catch (e: any) {
+      // Perdida de permiso
+      if (e instanceof ApiError && e.status === 403) {
+        show403();
+        setConfirmOpen(false);
+        setConfirmRow(null);
+        setLoading(false);
+        setConfirmBusy(false);
+        return;
+      }
+
+      // Mensaje más amigable como en tu código original
+      let msg = "No se pudo eliminar la categoría.";
       if (e instanceof ApiError) {
-        // Si tu backend devuelve 409/400 para integridad referencial:
         if (e.status === 409 || e.status === 500) {
           msg =
-            "No se puede eliminar la categoría porque tiene productos asociados.";
+              "No se puede eliminar la categoría porque tiene productos o subcategorías asociadas.";
         } else if (typeof e.details === "string") {
-          // A veces tu httpClient trae el body como texto
           const t = e.details.toLowerCase();
-          if (t.includes("llave foránea") || t.includes("foreign key") || t.includes("23503")) {
+          if (
+              t.includes("llave foránea") ||
+              t.includes("foreign key") ||
+              t.includes("23503")
+          ) {
             msg =
-              "No se puede eliminar la categoría porque tiene productos asociados.";
+                "No se puede eliminar la categoría porque tiene productos o subcategorías asociadas.";
           } else {
             msg = e.details;
           }
@@ -108,174 +345,246 @@ export default function Categorias() {
         }
       }
 
-      alert(msg);
-    }
-  };
+      // ahora mostramos el error arriba (no usamos alert)
+      setErr(msg);
 
-  // helper para mostrar el padre
-  // antes: const textoPadre = (c: Categoria) => (c.idCategoriaPadre ?? "—");
-  const textoPadre = (c: Categoria) => {
-    const idPadre = c.idCategoriaPadre;
-    if (!idPadre) return "—";
-    return parentNameMap.get(idPadre) ?? String(idPadre); // fallback al id si no está en el mapa
-  };
+      setConfirmOpen(false);
+      setConfirmRow(null);
+    } finally {
+      setLoading(false);
+      setConfirmBusy(false);
+    }
+  }
+
+  // autocerrar confirm si pierde permisos mientras el modal está abierto
+  useEffect(() => {
+    if (!confirmOpen || !confirmRow) return;
+    if (!canEliminar) {
+      setConfirmOpen(false);
+      setConfirmRow(null);
+      show403();
+    }
+  }, [confirmOpen, confirmRow, canEliminar]);
+
+  // ===== Restricción visual si no puede ver =====
+  if (!canVer) {
+    return (
+        <div className="p-6">
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-4 text-sm">
+            No tienes permiso para ver categorías.
+          </div>
+        </div>
+    );
+  }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-4">Categorías</h1>
+      <div className="p-6 space-y-4">
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <h1 className="text-xl font-semibold text-neutral-800">Categorías</h1>
 
-      {/* Filtros / acciones */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4 items-end justify-between">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex flex-col">
-            <label className="text-sm text-neutral-600 mb-1">Buscar</label>
-            <input
-              value={q}
-              onChange={(e) => { setPage(0); setQ(e.target.value); }}
-              placeholder="Nombre o descripción…"
-              className="border rounded-lg px-3 py-2 w-full sm:w-72"
-            />
-
-          </div>
-          <label className="inline-flex items-center gap-2 text-sm text-neutral-700 mb-1 sm:mb-0">
-            <input
-              type="checkbox"
-              className="accent-emerald-600"
-              checked={soloRaices}
-              onChange={(e) => { setPage(0); setSoloRaices(e.target.checked); }}
-            />
-            Solo raíces (sin padre)
-          </label>
-        </div>
-
-        <button
-          className="h-10 px-4 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-          onClick={() => setShowNew(true)}
-        >
-          + Nueva categoría
-        </button>
-      </div>
-
-      {/* Encabezado solo en md+ */}
-      <div className="hidden md:grid md:grid-cols-[1.2fr_0.6fr_1.8fr_120px] items-center text-xs uppercase text-neutral-500 px-3">
-        <div>Nombre</div>
-        <div>Padre</div>
-        <div>Descripción</div>
-        <div className="text-right pr-1">Acciones</div>
-      </div>
-
-
-      {/* Filas tipo card, sin tabla */}
-      <div className="mt-2 space-y-3">
-        {loading ? (
-          <div className="bg-white rounded-xl p-4 shadow-sm">Cargando…</div>
-        ) : rows.length ? (
-          rows.map((c) => (
-            <div
-              key={c.idCategoria}
-              // En móvil: 1 columna (card). En md+: 4 columnas (tabla).
-              className="
-      grid grid-cols-1 md:grid-cols-[1.2fr_0.6fr_1.8fr_120px]
-      items-center gap-2 bg-white rounded-xl p-3 shadow-sm
-      hover:shadow-md transition
-    "
-            >
-              {/* Columna 1: Nombre (siempre) */}
-              <div className="min-w-0">
-                <div className="font-semibold text-neutral-800 truncate">
-                  {c.nombreCategoria}
-                </div>
-
-                {/* Subtítulo en móvil: Padre · Descripción */}
-                <div className="mt-1 text-[13px] text-neutral-600 md:hidden break-words">
-                  <span className="font-medium text-neutral-700">Padre:</span>{" "}
-                  {textoPadre(c)}{" "}<span className="mx-1">·</span>{" "}
-                  <span className="font-medium text-neutral-700">Desc:</span>{" "}
-                  {c.descripcion || "—"}
-                </div>
-              </div>
-
-              {/* Columna 2 (md+): Padre */}
-              <div className="hidden md:block truncate">{textoPadre(c)}</div>
-
-              {/* Columna 3 (md+): Descripción */}
-              <div className="hidden md:block truncate">{c.descripcion || "—"}</div>
-
-              {/* Columna 4: Acciones */}
-              <div className="flex items-center md:justify-end gap-1 mt-2 md:mt-0">
-                <button
-                  aria-label="Editar"
-                  title="Editar"
-                  onClick={() => setEditRow(c)}
-                  className="p-2 rounded-md hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
-                >
-                  <Pencil size={18} />
-                </button>
-                <button
-                  aria-label="Eliminar"
-                  title="Eliminar"
-                  onClick={() => onEliminar(c.idCategoria)}
-                  className="p-2 rounded-md hover:bg-neutral-100 text-rose-600 hover:text-rose-700"
-                >
-                  <Trash2 size={18} />
-                </button>
+          <div className="md:ml-auto flex flex-col sm:flex-row gap-3 sm:gap-2 items-stretch sm:items-end">
+            {/* Buscar */}
+            <div className="flex flex-col">
+              <label className="text-[13px] text-neutral-600 mb-1">Buscar</label>
+              <div className="relative">
+                <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Nombre o descripción…"
+                    className="border border-gray-300 rounded-lg px-3 py-2 w-full sm:w-72 pr-8 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 text-[11px]">
+                ⌘K
+              </span>
               </div>
             </div>
-          ))
 
-        ) : (
-          <div className="text-center text-neutral-500 py-10 bg-white rounded-xl">
-            Sin registros
+            {/* Solo raíces */}
+            <label className="inline-flex items-center gap-2 text-sm text-neutral-700">
+              <input
+                  type="checkbox"
+                  className="accent-emerald-600"
+                  checked={soloRaices}
+                  onChange={(e) => {
+                    setSoloRaices(e.target.checked);
+                    setPage(0);
+                  }}
+              />
+              Solo raíces
+            </label>
+
+            {/* Nueva categoría */}
+            {canCrear && (
+                <button
+                    className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 text-sm shadow-sm disabled:opacity-50"
+                    onClick={() => setShowNew(true)}
+                    disabled={loading}
+                >
+                  + Nueva categoría
+                </button>
+            )}
           </div>
-        )}
-      </div>
-
-      {/* Paginación */}
-      {totalPages > 1 && (
-        <div className="mt-4">
-          <Paginacion
-            page={page}
-            totalPages={totalPages}
-            totalElements={total}
-            size={size}
-            setPage={setPage}
-            setSize={setSize}
-            loading={loading}
-            isFirst={page === 0}
-            isLast={page + 1 >= totalPages}
-          />
         </div>
-      )}
 
-      {/* Crear */}
-      <CategoriaModal
-        open={showNew}
-        onClose={() => setShowNew(false)}
-        onSubmit={onCrear}
-        title="Nueva categoría"
-      />
+        {/* Estado global */}
+        {loading && <div>Cargando…</div>}
 
-      {/* Editar */}
-      <CategoriaModal
-        open={!!editRow}
-        onClose={() => setEditRow(null)}
-        title="Editar categoría"
-        initial={
-          editRow
-            ? {
-              nombreCategoria: editRow.nombreCategoria,
-              descripcion: editRow.descripcion ?? "",
-              idCategoriaPadre: editRow.idCategoriaPadre ?? null,
+        {err && (
+            <div className="text-red-600 whitespace-pre-wrap border border-red-200 bg-red-50 rounded px-3 py-2 text-sm">
+              {err}
+            </div>
+        )}
+
+        {/* Encabezado tabla desktop */}
+        <div className="hidden md:grid md:grid-cols-[1.2fr_0.6fr_1.8fr_130px] items-center text-xs uppercase text-neutral-500 px-3">
+          <div>Nombre</div>
+          <div>Padre</div>
+          <div>Descripción</div>
+          <div className="text-right pr-1">Acciones</div>
+        </div>
+
+        {/* Lista */}
+        <div className="mt-2 space-y-3">
+          {!loading && !rows.length ? (
+              <div className="text-center text-neutral-500 py-10 bg-white rounded-xl border border-neutral-200/60 text-sm">
+                Sin registros
+              </div>
+          ) : null}
+
+          {rows.map((c) => (
+              <div
+                  key={c.idCategoria}
+                  className="grid grid-cols-1 md:grid-cols-[1.2fr_0.6fr_1.8fr_130px] items-start gap-2 bg-white rounded-xl p-3 border border-neutral-200/60 shadow-sm hover:shadow-md transition"
+              >
+                {/* Nombre + resumen mobile */}
+                <div className="min-w-0">
+                  <div
+                      className="font-semibold text-neutral-800 truncate"
+                      title={c.nombreCategoria}
+                  >
+                    {c.nombreCategoria}
+                  </div>
+
+                  {/* Mobile extra info */}
+                  <div className="mt-1 text-[13px] text-neutral-600 md:hidden break-words">
+                    <span className="font-medium text-neutral-700">Padre:</span>{" "}
+                    {textoPadre(c)}{" "}
+                    <span className="mx-1">·</span>
+                    <span className="font-medium text-neutral-700">Desc:</span>{" "}
+                    {c.descripcion || "—"}
+                  </div>
+                </div>
+
+                {/* Padre (md+) */}
+                <div className="hidden md:block truncate text-sm text-neutral-800">
+                  {textoPadre(c)}
+                </div>
+
+                {/* Descripción (md+) */}
+                <div className="hidden md:block truncate text-sm text-neutral-700">
+                  {c.descripcion || "—"}
+                </div>
+
+                {/* Acciones */}
+                <div className="flex flex-row flex-wrap gap-1.5 text-sm md:justify-end md:items-start mt-2 md:mt-0">
+                  {canEditar && (
+                      <IconBtn
+                          title="Editar"
+                          onClick={() => setEditRow(c)}
+                      >
+                        <Pencil size={18} className="text-neutral-700" />
+                      </IconBtn>
+                  )}
+
+                  {canEliminar && (
+                      <IconBtn
+                          title="Eliminar"
+                          onClick={() => askEliminar(c)}
+                      >
+                        <Trash2 size={18} className="text-rose-600" />
+                      </IconBtn>
+                  )}
+                </div>
+              </div>
+          ))}
+        </div>
+
+        {/* Paginación */}
+        {totalPages > 1 && (
+            <div className="mt-2">
+              <Paginacion
+                  page={page}
+                  totalPages={totalPages}
+                  totalElements={total}
+                  size={size}
+                  setPage={setPage}
+                  setSize={setSize}
+                  loading={loading}
+                  isFirst={page === 0}
+                  isLast={page + 1 >= totalPages}
+              />
+            </div>
+        )}
+
+        {/* MODAL CREAR */}
+        {canCrear && (
+            <CategoriaModal
+                open={showNew}
+                title="Nueva categoría"
+                onClose={() => setShowNew(false)}
+                onSubmit={onCrear}
+            />
+        )}
+
+        {/* MODAL EDITAR */}
+        {canEditar && (
+            <CategoriaModal
+                open={!!editRow}
+                title="Editar categoría"
+                onClose={() => setEditRow(null)}
+                initial={
+                  editRow
+                      ? {
+                        nombreCategoria: editRow.nombreCategoria,
+                        descripcion: editRow.descripcion ?? "",
+                        idCategoriaPadre: editRow.idCategoriaPadre ?? null,
+                      }
+                      : undefined
+                }
+                excludeIdAsParent={editRow?.idCategoria ?? null}
+                onSubmit={async (payload) => {
+                  if (!editRow) return;
+                  await onEditar(editRow.idCategoria, payload);
+                }}
+            />
+        )}
+
+        {/* MODAL CONFIRM ELIMINAR */}
+        <ConfirmModal
+            open={confirmOpen && !!confirmRow}
+            title="Eliminar categoría"
+            message={
+              <>
+                ¿Eliminar la categoría{" "}
+                <b>{confirmRow?.nombreCategoria}</b> de forma permanente?
+                <br />
+                <span className="text-neutral-600">
+              Esta acción no se puede deshacer.
+            </span>
+              </>
             }
-            : undefined
-        }
-        excludeIdAsParent={editRow?.idCategoria ?? null}
-        onSubmit={async (payload) => {
-          if (!editRow) return;
-          await onEditar(editRow.idCategoria, payload);
-          setEditRow(null);
-        }}
-      />
-    </div>
+            confirmLabel="Eliminar"
+            cancelLabel="Cancelar"
+            kind="danger"
+            loading={confirmBusy}
+            onConfirm={doEliminar}
+            onClose={() => {
+              if (confirmBusy) return;
+              setConfirmOpen(false);
+              setConfirmRow(null);
+            }}
+        />
+      </div>
   );
 }

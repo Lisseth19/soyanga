@@ -5,7 +5,9 @@ import com.soyanga.soyangabackend.dto.common.OpcionIdNombre;
 import com.soyanga.soyangabackend.dto.sucursales.*;
 import com.soyanga.soyangabackend.repositorio.catalogo.SucursalRepositorio;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,12 +18,12 @@ public class SucursalServicio {
 
     private final SucursalRepositorio repo;
 
-    public Page<SucursalRespuestaDTO> listar(String q, String ciudad, boolean soloActivos, Pageable pageable) {
-        var page = repo.listar(
-                (q == null || q.isBlank()) ? null : q.trim(),
-                (ciudad == null || ciudad.isBlank()) ? null : ciudad.trim(),
-                soloActivos,
-                pageable);
+    /** Listar con filtro de incluirInactivos (igual al patrón de Almacenes). */
+    public Page<SucursalRespuestaDTO> listar(String q, String ciudad, boolean incluirInactivos, Pageable pageable) {
+        String filtroQ = (q == null || q.isBlank()) ? null : q.trim();
+        String filtroCiudad = (ciudad == null || ciudad.isBlank()) ? null : ciudad.trim();
+
+        var page = repo.listar(filtroQ, filtroCiudad, incluirInactivos, pageable);
         return page.map(p -> SucursalRespuestaDTO.builder()
                 .idSucursal(p.getIdSucursal())
                 .nombreSucursal(p.getNombreSucursal())
@@ -52,20 +54,37 @@ public class SucursalServicio {
         e.setNombreSucursal(dto.getNombreSucursal());
         e.setDireccion(dto.getDireccion());
         e.setCiudad(dto.getCiudad());
-        if (dto.getEstadoActivo() != null)
+        if (dto.getEstadoActivo() != null) {
             e.setEstadoActivo(dto.getEstadoActivo());
+        }
         e = repo.save(e);
         return toDTO(e);
     }
 
-    public void eliminar(Long id) {
-        if (!repo.existsById(id))
+    /** Cambiar estado vía UPDATE directo (performante y consistente con Almacenes). */
+    public void cambiarEstado(Long id, boolean activo) {
+        int updated = repo.updateEstado(id, activo);
+        if (updated == 0) {
             throw new IllegalArgumentException("Sucursal no encontrada: " + id);
-        repo.deleteById(id);
+        }
     }
 
-    public List<OpcionIdNombre> opciones(boolean soloActivos) {
-        return repo.opciones(soloActivos);
+    /** Eliminar con manejo amigable de integridad referencial. */
+    public void eliminar(Long id) {
+        if (!repo.existsById(id)) {
+            throw new IllegalArgumentException("Sucursal no encontrada: " + id);
+        }
+        try {
+            repo.deleteById(id);
+        } catch (DataIntegrityViolationException ex) {
+            // Si hay FK (p. ej., almacenes que referencian la sucursal), lanzamos mensaje claro
+            throw new IllegalStateException("No se puede eliminar la sucursal porque está en uso por otros recursos.", ex);
+        }
+    }
+
+    /** Opciones para combos, con el mismo criterio de incluirInactivos. */
+    public List<OpcionIdNombre> opciones(boolean incluirInactivos) {
+        return repo.opciones(incluirInactivos);
     }
 
     private SucursalRespuestaDTO toDTO(Sucursal e) {

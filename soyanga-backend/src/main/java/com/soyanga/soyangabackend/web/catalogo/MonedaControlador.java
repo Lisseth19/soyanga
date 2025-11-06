@@ -18,13 +18,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/catalogo/monedas")
 @RequiredArgsConstructor
-@PreAuthorize("@perms.tiene(authentication, 'monedas:ver')") // lectura por defecto
 public class MonedaControlador {
 
     private final MonedaServicio servicio;
 
     // Listado paginado con búsqueda/orden/filtro de activos
     @GetMapping
+    @PreAuthorize("@perms.tiene(authentication, 'monedas:ver')")
     public Page<MonedaDTO> listar(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Boolean activos,
@@ -34,6 +34,7 @@ public class MonedaControlador {
 
     // Solo NO locales con su TC
     @GetMapping("/no-locales")
+    @PreAuthorize("@perms.tiene(authentication, 'monedas:ver')")
     public List<MonedaDTO> listarNoLocalesConTC(
             @RequestParam(required = false) Boolean activos,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
@@ -42,6 +43,7 @@ public class MonedaControlador {
 
     // Moneda local (única)
     @GetMapping("/local")
+    @PreAuthorize("@perms.tiene(authentication, 'monedas:ver')")
     public MonedaDTO obtenerLocal() {
         return servicio.obtenerLocal();
     }
@@ -60,7 +62,7 @@ public class MonedaControlador {
     }
 
     @PatchMapping("/{id}/estado")
-    @PreAuthorize("@perms.tiene(authentication, 'monedas:actualizar')")
+    @PreAuthorize("@perms.tiene(authentication, 'monedas:cambiar-estado')")
     public MonedaDTO cambiarEstado(@PathVariable Long id, @RequestParam boolean activo) {
         return servicio.cambiarEstado(id, activo);
     }

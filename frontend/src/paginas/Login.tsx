@@ -1,9 +1,11 @@
 // src/paginas/Login.tsx
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import logo from "@/assets/logo.png";
+import agroBg from "@/assets/agro4.jpg";
 
-// ==== Icons ====
+/* ===== Icons inline ===== */
 function EyeIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
@@ -43,7 +45,7 @@ export default function LoginPage() {
     const nav = useNavigate();
     const loc = useLocation() as any;
 
-    // Evitar indexación por buscadores
+    // Evitar indexación
     useEffect(() => {
         const meta = document.createElement("meta");
         meta.name = "robots";
@@ -55,7 +57,6 @@ export default function LoginPage() {
     // Recordarme (solo usuario)
     const storedRemember = localStorage.getItem("login.remember") === "1";
     const storedUser = localStorage.getItem("login.username") ?? "";
-
     const [u, setU] = useState(storedRemember ? storedUser : "");
     const [p, setP] = useState("");
     const [remember, setRemember] = useState(storedRemember);
@@ -64,8 +65,9 @@ export default function LoginPage() {
     const [err, setErr] = useState<string | null>(null);
     const [show, setShow] = useState(false);
     const [showToast, setShowToast] = useState(false);
+    const [caps, setCaps] = useState(false);
 
-    // auto-hide del toast de error
+    // Toast autodescartable
     useEffect(() => {
         if (!err) return;
         setShowToast(true);
@@ -73,7 +75,7 @@ export default function LoginPage() {
         return () => clearTimeout(t);
     }, [err]);
 
-    // persistencia del “recordarme”
+    // Persistencia “recordarme”
     useEffect(() => {
         localStorage.setItem("login.remember", remember ? "1" : "0");
         if (!remember) localStorage.removeItem("login.username");
@@ -82,26 +84,25 @@ export default function LoginPage() {
 
     const disabled = useMemo(() => loading || !u.trim() || !p.trim(), [loading, u, p]);
 
-    // Si ya hay sesión y alguien entra al login, mándalo a /inicio
+    // Si ya hay sesión y entran al login → /inicio
     useEffect(() => {
         if (!user) return;
         const rawFrom = (loc?.state as any)?.from?.pathname as string | undefined;
         const back = rawFrom && !rawFrom.startsWith("/soyanga") ? rawFrom : "/inicio";
         nav(back, { replace: true });
-    }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]);
 
-    const onSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const trySubmit = async () => {
+        if (!u.trim()) { setErr("Ingresa tu usuario"); return; }
+        if (!p.trim()) { setErr("Ingresa tu contraseña"); return; }
         setErr(null);
         setLoading(true);
         try {
             await login(u, p);
             if (remember) localStorage.setItem("login.username", u.trim());
-
-            // Destino por defecto = /inicio (área operadores)
             const rawFrom = (loc?.state as any)?.from?.pathname as string | undefined;
             const to = rawFrom && !rawFrom.startsWith("/soyanga") ? rawFrom : "/inicio";
-
             nav(to, { replace: true });
         } catch (e: any) {
             const msg = typeof e?.message === "string" && e.message.trim()
@@ -114,155 +115,262 @@ export default function LoginPage() {
         }
     };
 
-    return (
-        <div className="min-h-screen grid lg:grid-cols-2 bg-white">
-            {/* Izquierda: bloque visual / mensaje */}
-            <div className="relative hidden lg:flex items-center justify-center overflow-hidden">
-                {/* Fondo con degradado suave + “textura” */}
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500" />
-                <div
-                    aria-hidden
-                    className="absolute inset-0 opacity-30"
-                    style={{
-                        backgroundImage:
-                            "radial-gradient(1200px 400px at 10% 10%, rgba(255,255,255,0.15), transparent), radial-gradient(800px 300px at 90% 20%, rgba(255,255,255,0.12), transparent), radial-gradient(700px 300px at 40% 90%, rgba(255,255,255,0.10), transparent)",
-                    }}
-                />
-                {/* Contenido */}
-                <div className="relative z-10 max-w-xl px-10 py-12 text-white">
-                    <div className="mb-6 inline-flex items-center gap-3 rounded-full bg-white/10 px-4 py-2 backdrop-blur">
-                        <span className="text-xl">🌿</span>
-                        <span className="text-sm tracking-wide">Agroinsumos & Gestión de Inventario</span>
-                    </div>
-                    <h2 className="text-4xl font-semibold leading-tight">
-                        Control preciso de lotes, vencimientos y almacenes
-                    </h2>
-                    <p className="mt-4 text-white/90">
-                        Consulta disponibilidad, filtra por almacén, fecha y SKU. Visualiza movimientos por lote y exporta tus datos en segundos.
-                    </p>
-                    <div className="mt-8 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-white/15 px-3 py-1 text-sm">📦 Productos</span>
-                        <span className="rounded-full bg-white/15 px-3 py-1 text-sm">🧪 Lotes & Vencimientos</span>
-                        <span className="rounded-full bg-white/15 px-3 py-1 text-sm">🏬 Almacenes</span>
-                        <span className="rounded-full bg-white/15 px-3 py-1 text-sm">🔐 Acceso seguro</span>
-                    </div>
-                    <p className="mt-10 text-xs text-white/80">© {new Date().getFullYear()} Soyanga</p>
-                </div>
-            </div>
+    const onSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        void trySubmit();
+    };
 
-            {/* Derecha: formulario */}
-            <div className="relative flex items-center justify-center p-6 sm:p-10">
-                {/* Toast de error (arriba, auto-cierre) */}
+    // Refs para “Enter → enfoca/manda”
+    const userRef = useRef<HTMLInputElement | null>(null);
+    const passRef = useRef<HTMLInputElement | null>(null);
+
+    // Enter UX
+    const onUserKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (!u.trim()) {
+                setErr("Ingresa tu usuario"); setShowToast(true);
+                userRef.current?.focus(); return;
+            }
+            passRef.current?.focus();
+        }
+    };
+    const onPassKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (!u.trim()) {
+                setErr("Ingresa tu usuario"); setShowToast(true);
+                userRef.current?.focus(); return;
+            }
+            if (!p.trim()) {
+                setErr("Ingresa tu contraseña"); setShowToast(true);
+                passRef.current?.focus(); return;
+            }
+            void trySubmit();
+        }
+    };
+
+    // Caps
+    const onKeyPass = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        const c = (e.getModifierState && e.getModifierState("CapsLock")) || false;
+        setCaps(c);
+    };
+
+    return (
+        <div className="min-h-screen relative overflow-hidden">
+            {/* Fondo de página con imagen + velo verde suave */}
+            <div
+                className="absolute inset-0 -z-10 bg-cover bg-center"
+                style={{ backgroundImage: `url(${agroBg})` }}
+                aria-hidden
+            />
+            <div className="absolute inset-0 -z-10 bg-gradient-to-t from-emerald-900/35 via-emerald-800/20 to-emerald-700/10" />
+
+            {/* Tarjeta partida (más grande) */}
+            <div className="min-h-screen w-full grid place-items-center p-4">
+                {/* Toast de error */}
                 {err && showToast && (
-                    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 toast-in">
-                        <div className="rounded-lg border border-red-200 bg-white/95 px-4 py-2 text-sm text-red-700 shadow-md">
+                    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-[fadeIn_200ms_ease-out]">
+                        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 shadow">
                             {err}
                         </div>
                     </div>
                 )}
 
-                {/* Sutil halo */}
-                <div className="pointer-events-none absolute -z-10 inset-0">
-                    <div className="absolute -top-16 -right-16 h-64 w-64 bg-emerald-200/60 blur-3xl rounded-full" />
+                <div className="w-full max-w-[980px] rounded-2xl shadow-2xl ring-1 ring-black/10 overflow-hidden bg-white/90 backdrop-blur">
+                    <div className="grid md:grid-cols-2">
+                        {/* Panel izquierdo (branding) */}
+                        <div className="relative min-h-[540px] bg-emerald-900 group">
+                            {/* Fondo con la misma imagen */}
+                            <div
+                                className="absolute inset-0 bg-cover bg-center"
+                                style={{ backgroundImage: `url(${agroBg})` }}
+                                aria-hidden
+                            />
+                            {/* ANTES: bg-emerald-950/70  ->  AHORA: /85 (menos transparente) */}
+                            <div className="absolute inset-0 bg-emerald-950/90" />
+
+                            <div className="relative z-[1] h-full p-8 sm:p-10 flex flex-col">
+                                {/* LOGO marca de agua con animación al hover */}
+                                <img
+                                    src={logo}
+                                    alt=""
+                                    aria-hidden
+                                    className="pointer-events-none select-none absolute -z-10 opacity-10
+                 transition-transform duration-700 ease-out
+                 group-hover:translate-x-4 group-hover:-translate-y-1 group-hover:scale-[1.02]"
+                                    style={{
+                                        width: 640,
+                                        right: -60,
+                                        bottom: -40,
+                                        filter: "grayscale(100%) brightness(1.5) contrast(1.05)",
+                                        transform: "rotate(-6deg)",
+                                    }}
+                                    draggable={false}
+                                />
+
+                                <div className="mb-6 inline-flex items-center gap-3 rounded-full bg-white/10 px-4 py-2 backdrop-blur ring-1 ring-white/20 w-fit">
+                                    <span>🌿</span>
+                                    <span className="text-white/95 text-[13px] tracking-wide">
+                    Agroimportadora — Gestión integral
+                  </span>
+                                </div>
+
+                                <h1 className="text-4xl sm:text-5xl font-black leading-tight text-white drop-shadow">
+                                    SOYANGA
+                                </h1>
+                                <p className="mt-2 text-white/90 text-[15px] max-w-md">
+                                    Compras, proveedores, ventas y control de inventario por lote en un solo lugar.
+                                </p>
+
+                                <div className="mt-auto grid grid-cols-2 gap-2 text-sm text-white/90">
+                                    <div className="rounded-xl bg-white/10 ring-1 ring-white/15 px-3 py-2">📦 Stock & productos</div>
+                                    <div className="rounded-xl bg-white/10 ring-1 ring-white/15 px-3 py-2">🧪 Lotes & vencimientos</div>
+                                    <div className="rounded-xl bg-white/10 ring-1 ring-white/15 px-3 py-2">🏬 Multi-almacén</div>
+                                    <div className="rounded-xl bg-white/10 ring-1 ring-white/15 px-3 py-2">🔐 Roles & auditoría</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Panel derecho (form) */}
+                        <div className="p-6 sm:p-10">
+                            <form
+                                onSubmit={onSubmit}
+                                className="mx-auto w-full max-w-md"
+                            >
+                                {/* Encabezado */}
+                                <div className="mb-7 text-center">
+                                    <div className="mx-auto mb-4 h-14 w-auto flex items-center justify-center">
+                                        <img src={logo} alt="Soyanga" className="h-25 w-auto" />
+                                    </div>
+                                    <h2 className="text-[22px] font-semibold tracking-tight text-green-900">
+                                        Iniciar sesión
+                                    </h2>
+                                    <p className="text-sm text-green-800/80">Accede al panel de gestión</p>
+                                </div>
+
+                                {/* Usuario */}
+                                <div className="space-y-1 mb-4">
+                                    <label htmlFor="usuario" className="text-sm text-green-900">Usuario</label>
+                                    <div className="relative group">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-800/60 group-focus-within:text-green-900 transition-colors">
+                      <UserIcon className="h-5 w-5" />
+                    </span>
+                                        <input
+                                            id="usuario"
+                                            ref={userRef}
+                                            className="w-full rounded-lg border border-green-800/20 bg-white px-10 py-2 outline-none
+                                 focus:border-green-700/40 focus:ring-2 focus:ring-green-600/20 transition
+                                 text-neutral-800 placeholder-green-900/35 caret-green-700"
+                                            autoFocus
+                                            autoComplete="username"
+                                            value={u}
+                                            onChange={(e) => setU(e.target.value)}
+                                            onKeyDown={onUserKeyDown}
+                                            placeholder="Username"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Password */}
+                                <div className="space-y-1 mb-5">
+                                    <div className="flex items-center justify-between">
+                                        <label htmlFor="password" className="text-sm text-green-900">Contraseña</label>
+                                        {caps && (
+                                            <span className="text-[11px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                        Bloq Mayús activado
+                      </span>
+                                        )}
+                                    </div>
+                                    <div className="relative group">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-800/60 group-focus-within:text-green-900 transition-colors">
+                      <LockIcon className="h-5 w-5" />
+                    </span>
+                                        <input
+                                            id="password"
+                                            ref={passRef}
+                                            type={show ? "text" : "password"}
+                                            onKeyUp={onKeyPass}
+                                            onKeyDown={(e) => { onKeyPass(e); onPassKeyDown(e); }}
+                                            onBlur={() => setCaps(false)}
+                                            className="w-full rounded-lg border border-green-800/20 bg-white px-10 py-2 pr-10 outline-none
+                                 focus:border-green-700/40 focus:ring-2 focus:ring-green-600/20 transition
+                                 text-neutral-800 placeholder-green-900/35 caret-green-700"
+                                            value={p}
+                                            onChange={(e) => setP(e.target.value)}
+                                            autoComplete="current-password"
+                                            placeholder="••••••••"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShow(!show)}
+                                            aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-green-800/60 hover:text-green-900 transition"
+                                        >
+                                            {show ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Recordarme + Olvidé */}
+                                <div className="mb-6 flex items-center justify-between gap-3">
+                                    <label className="inline-flex items-center gap-2 text-sm text-green-900 select-none">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4 rounded border-green-700/40 text-green-700 focus:ring-green-600"
+                                            checked={remember}
+                                            onChange={(e) => setRemember(e.target.checked)}
+                                        />
+                                        Recordarme
+                                    </label>
+                                    <Link
+                                        to="/soyanga/reset-password"
+                                        className="text-sm text-green-700 hover:text-green-800 underline underline-offset-4"
+                                    >
+                                        ¿Olvidaste tu contraseña?
+                                    </Link>
+                                </div>
+
+                                {/* Submit */}
+                                <button
+                                    className="grid w-full place-items-center rounded-lg bg-green-700 text-white py-2.5
+                             hover:bg-green-800 transition shadow-md disabled:opacity-50"
+                                    disabled={disabled}
+                                    type="submit"
+                                >
+                                    {loading ? (
+                                        <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-b-transparent" />
+                      Ingresando…
+                    </span>
+                                    ) : (
+                                        "Ingresar"
+                                    )}
+                                </button>
+
+                                {/* Footer */}
+                                <div className="mt-5 text-[11px] text-green-900/60 text-center">
+                                    © {new Date().getFullYear()} Soyanga — Acceso de personal autorizado
+                                    <div className="mt-1">
+                                        <Link to="/soyanga/contacto" className="text-green-700 underline underline-offset-4 hover:text-green-800">
+                                            Necesito ayuda
+                                        </Link>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
 
-                <form
-                    onSubmit={onSubmit}
-                    className="w-[min(440px,94vw)] rounded-2xl bg-white/90 backdrop-blur p-6 sm:p-8 shadow-xl ring-1 ring-neutral-200"
-                >
-                    {/* Encabezado centrado */}
-                    <div className="mb-6 text-center">
-                        <div className="mx-auto mb-3 h-10 w-10 grid place-items-center rounded-full bg-emerald-100">
-                            <span className="text-emerald-700">🌱</span>
-                        </div>
-                        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">
-                            Iniciar sesión
-                        </h1>
-                        <p className="text-sm text-neutral-500">
-                            Accede al panel de gestión
-                        </p>
-                    </div>
-
-                    {/* Usuario */}
-                    <div className="space-y-1 mb-4">
-                        <label htmlFor="usuario" className="text-sm text-neutral-700">Usuario</label>
-                        <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
-                <UserIcon className="h-5 w-5" />
-              </span>
-                            <input
-                                id="usuario"
-                                className="w-full rounded-lg border border-neutral-300 bg-white px-10 py-2 outline-none ring-emerald-200 focus:border-emerald-400 focus:ring-2 transition"
-                                autoFocus
-                                autoComplete="username"
-                                value={u}
-                                onChange={(e) => setU(e.target.value)}
-                                placeholder="tu_usuario"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Password */}
-                    <div className="space-y-1 mb-5">
-                        <label htmlFor="password" className="text-sm text-neutral-700">Contraseña</label>
-                        <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
-                <LockIcon className="h-5 w-5" />
-              </span>
-                            <input
-                                id="password"
-                                type={show ? "text" : "password"}
-                                className="w-full rounded-lg border border-neutral-300 bg-white px-10 py-2 pr-10 outline-none ring-emerald-200 focus:border-emerald-400 focus:ring-2 transition"
-                                value={p}
-                                onChange={(e) => setP(e.target.value)}
-                                autoComplete="current-password"
-                                placeholder="••••••••"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShow((s) => !s)}
-                                aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition"
-                            >
-                                {show ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Recordarme */}
-                    <div className="mb-6 text-center">
-                        <label className="inline-flex items-center gap-2 text-sm text-neutral-700 select-none">
-                            <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500"
-                                checked={remember}
-                                onChange={(e) => setRemember(e.target.checked)}
-                            />
-                            Recordarme (autorrellenar usuario)
-                        </label>
-                    </div>
-
-                    {/* Submit */}
-                    <button
-                        className="grid w-full place-items-center rounded-lg bg-emerald-600 text-white py-2.5 hover:bg-emerald-700 disabled:opacity-50 transition"
-                        disabled={disabled}
-                        type="submit"
-                    >
-                        {loading ? (
-                            <span className="inline-flex items-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-b-transparent" />
-                Ingresando…
-              </span>
-                        ) : (
-                            "Ingresar"
-                        )}
-                    </button>
-
-                    <p className="mt-5 text-[11px] text-neutral-500 text-center">
-                        © {new Date().getFullYear()} Soyanga — Acceso de personal autorizado
-                    </p>
-                </form>
             </div>
+
+            {/* keyframes */}
+            <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
         </div>
     );
 }
