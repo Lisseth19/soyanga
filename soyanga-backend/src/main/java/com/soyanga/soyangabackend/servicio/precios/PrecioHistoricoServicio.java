@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class PrecioHistoricoServicio {
 
     private final PrecioVentaHistoricoRepositorio precioRepo;
+    private final PoliticaRedondeo redondeo;
 
     public Page<PrecioHistoricoDTO> listar(Long idPresentacion, Pageable pageable) {
         var page = precioRepo.findByIdPresentacionOrderByFechaInicioVigenciaDesc(idPresentacion, pageable);
@@ -23,30 +24,39 @@ public class PrecioHistoricoServicio {
     }
 
     public PrecioHistoricoDTO vigente(Long idPresentacion) {
-        var opt = precioRepo.findFirstByIdPresentacionAndFechaFinVigenciaIsNullOrderByFechaInicioVigenciaDesc(idPresentacion);
+        var opt = precioRepo
+                .findFirstByIdPresentacionAndFechaFinVigenciaIsNullOrderByFechaInicioVigenciaDesc(idPresentacion);
         return opt.map(this::toDTO).orElse(null);
     }
 
     @Transactional
     public PrecioHistoricoDTO crearNuevo(Long idPresentacion, PrecioNuevoDTO dto) {
-        LocalDateTime inicio = dto.getFechaInicioVigencia() != null ? dto.getFechaInicioVigencia() : LocalDateTime.now();
+        LocalDateTime inicio = dto.getFechaInicioVigencia() != null
+                ? dto.getFechaInicioVigencia()
+                : LocalDateTime.now();
 
-        // Cerrar vigente si existe
-        var vigenteOpt = precioRepo.findFirstByIdPresentacionAndFechaFinVigenciaIsNullOrderByFechaInicioVigenciaDesc(idPresentacion);
+        // 1) Redondeo consistente con toda la app
+        var precioRedondeado = redondeo.aplicar(dto.getPrecioVentaBob());
+
+        // 2) Bloquear vigente (usa el finder con @Lock que pusimos en el repo)
+        var vigenteOpt = precioRepo
+                .findFirstByIdPresentacionAndFechaFinVigenciaIsNullOrderByFechaInicioVigenciaDesc(idPresentacion);
+
         if (vigenteOpt.isPresent()) {
             var vigente = vigenteOpt.get();
             if (inicio.isBefore(vigente.getFechaInicioVigencia())) {
-                throw new IllegalArgumentException("La fecha de inicio del nuevo precio no puede ser anterior al vigente actual");
+                throw new IllegalArgumentException(
+                        "La fecha de inicio del nuevo precio no puede ser anterior al vigente actual");
             }
-            // Cerramos el vigente justo antes del nuevo
-            vigente.setFechaFinVigencia(inicio.minusSeconds(1));
+            // 3) Cerrar el vigente justo antes del nuevo (más preciso con nanosegundos)
+            vigente.setFechaFinVigencia(inicio.minusNanos(1));
             precioRepo.save(vigente);
         }
 
-        // Crear nuevo precio
+        // 4) Crear el nuevo histórico
         var nuevo = PrecioVentaHistorico.builder()
                 .idPresentacion(idPresentacion)
-                .precioVentaBob(dto.getPrecioVentaBob())
+                .precioVentaBob(precioRedondeado)
                 .fechaInicioVigencia(inicio)
                 .fechaFinVigencia(null)
                 .motivoCambio(dto.getMotivoCambio())

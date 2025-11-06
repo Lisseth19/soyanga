@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.*;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.*;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -46,7 +48,113 @@ public class GlobalExceptionHandler {
         public Map<String, Object> getErrors() { return errors; }
     }
 
+
+    private static Throwable rootCause(Throwable t) {
+        Throwable r = t;
+        while (r.getCause() != null && r.getCause() != r)
+            r = r.getCause();
+        return r;
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
+    }
+
+    private static Map<String, Object> dbDetails(Throwable ex) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        Throwable root = rootCause(ex);
+
+        // Postgres driver
+        try {
+            Class<?> psqlEx = Class.forName("org.postgresql.util.PSQLException");
+            if (psqlEx.isInstance(root)) {
+                var sqlState = (String) psqlEx.getMethod("getSQLState").invoke(root);
+                map.put("sqlState", sqlState);
+                map.put("dbMessage", safe(root.getMessage()));
+            }
+        } catch (Exception ignore) {
+        }
+
+        // Hibernate JDBCException
+        try {
+            Class<?> jdbcEx = Class.forName("org.hibernate.exception.JDBCException");
+            if (jdbcEx.isInstance(ex)) {
+                var sql = (String) jdbcEx.getMethod("getSQL").invoke(ex);
+                map.put("sql", sql);
+            }
+        } catch (Exception ignore) {
+        }
+
+        // Spring JDBC exceptions with getSql()
+        try {
+            Class<?> badSql = Class.forName("org.springframework.jdbc.BadSqlGrammarException");
+            if (badSql.isInstance(ex)) {
+                var sql = (String) badSql.getMethod("getSql").invoke(ex);
+                map.put("sql", sql);
+            }
+        } catch (Exception ignore) {
+        }
+        try {
+            Class<?> unc = Class.forName("org.springframework.jdbc.UncategorizedSQLException");
+            if (unc.isInstance(ex)) {
+                var sql = (String) unc.getMethod("getSql").invoke(ex);
+                map.put("sql", sql);
+            }
+        } catch (Exception ignore) {
+        }
+
+        map.putIfAbsent("rootMessage", safe(root.getMessage()));
+        return map;
+    }
+
+    /* 400/500: errores de SQL tipado/gramática (parámetros, casts, etc.) */
+    @ExceptionHandler({
+            org.springframework.jdbc.BadSqlGrammarException.class,
+            org.springframework.jdbc.UncategorizedSQLException.class
+    })
+    public ResponseEntity<ApiError> handleJdbcGrammar(Exception ex, HttpServletRequest req) {
+        var details = dbDetails(ex);
+        var sqlState = String.valueOf(details.getOrDefault("sqlState", ""));
+        // Si es 42P.. (errores de sintaxis/parametrización en Postgres), respondemos
+        // 400
+        boolean clientFault = sqlState.startsWith("42");
+        var status = clientFault ? HttpStatus.BAD_REQUEST : HttpStatus.INTERNAL_SERVER_ERROR;
+        var msg = clientFault ? "Consulta SQL inválida o parámetros mal tipados" : "Error de base de datos";
+        log.error("[SQL] {} on {} -> {} | details={}", status.value(), req.getRequestURI(), msg, details, ex);
+        return ResponseEntity.status(status).body(new ApiError(status, msg, req.getRequestURI(), details));
+    }
+
+    /* 500: errores JPA/Hibernate genéricos */
+    @ExceptionHandler({
+            jakarta.persistence.PersistenceException.class,
+            org.springframework.orm.jpa.JpaSystemException.class
+    })
+    public ResponseEntity<ApiError> handleJpa(Exception ex, HttpServletRequest req) {
+        var details = dbDetails(ex); // deja el método como lo tienes (usa reflection)
+        log.error("[JPA] 500 on {} | details={}", req.getRequestURI(), details, ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error de persistencia", req.getRequestURI(),
+                        details));
+    }
+
+    /*
+     * 500 (o 409/400 según convenga): cualquier DataAccessException no mapeada
+     * arriba
+     */
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<ApiError> handleDataAccess(org.springframework.dao.DataAccessException ex,
+            HttpServletRequest req) {
+        var details = dbDetails(ex);
+        log.error("[DAO] 500 on {} | details={}", req.getRequestURI(), details, ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error de acceso a datos", req.getRequestURI(),
+                        details));
+    }
+
+    /* 401: credenciales inválidas (lanzadas en controlador/servicio) */
+
     /* ================== Auth / permisos ================== */
+
 
     @ExceptionHandler({ BadCredentialsException.class, UsernameNotFoundException.class, AuthenticationException.class })
     public ResponseEntity<ApiError> handleCredenciales(Exception ex, HttpServletRequest req) {
@@ -237,9 +345,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleAll(Exception ex, HttpServletRequest req) {
-        var body = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", req.getRequestURI(), null);
+
+        log.error("[GENERIC] 500 on {}", req.getRequestURI(), ex);
+        var body = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", req.getRequestURI(),
+                null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
+}
 
     /* ================== Helpers ================== */
 
@@ -285,3 +397,4 @@ public class GlobalExceptionHandler {
         return new SqlInfo(sqlState, vendor, constraint, raw);
     }
 }
+

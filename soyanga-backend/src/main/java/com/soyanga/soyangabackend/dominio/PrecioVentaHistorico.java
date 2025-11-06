@@ -2,18 +2,20 @@ package com.soyanga.soyangabackend.dominio;
 
 import jakarta.persistence.*;
 import lombok.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-        name = "precios_de_venta_historicos",
-        indexes = {
-                @Index(name = "idx_precios_hist_presentacion", columnList = "id_presentacion, fecha_inicio_vigencia")
-        }
-)
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Table(name = "precios_de_venta_historicos", indexes = {
+        @Index(name = "idx_precios_hist_presentacion", columnList = "id_presentacion, fecha_inicio_vigencia")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class PrecioVentaHistorico {
 
@@ -35,8 +37,11 @@ public class PrecioVentaHistorico {
     @Column(name = "fecha_fin_vigencia")
     private LocalDateTime fechaFinVigencia;
 
-    @Column(name = "motivo_cambio")
+    @Column(name = "motivo_cambio", columnDefinition = "text")
     private String motivoCambio;
+
+    @Column(name = "usuario", columnDefinition = "text")
+    private String usuario;
 
     /** Completa fecha de inicio si viene nula y valida el rango. */
     @PrePersist
@@ -63,8 +68,16 @@ public class PrecioVentaHistorico {
                 && this.fechaInicioVigencia != null
                 && this.fechaFinVigencia.isBefore(this.fechaInicioVigencia)) {
             throw new IllegalStateException(
-                    "fecha_fin_vigencia no puede ser anterior a fecha_inicio_vigencia"
-            );
+                    "fecha_fin_vigencia no puede ser anterior a fecha_inicio_vigencia");
         }
+    }
+
+    /**
+     * Vigente = sin fechaFin. Si quisieras “vigente a una fecha”, pásala por
+     * parámetro.
+     */
+    @JsonIgnore
+    public boolean isVigente() {
+        return this.fechaFinVigencia == null;
     }
 }
