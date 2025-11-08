@@ -1,16 +1,19 @@
 package com.soyanga.soyangabackend.servicio.catalogo;
 
 import com.soyanga.soyangabackend.dominio.Producto;
-import com.soyanga.soyangabackend.dto.catalogo.*;
+import com.soyanga.soyangabackend.dto.catalogo.ProductoActualizarDTO;
+import com.soyanga.soyangabackend.dto.catalogo.ProductoCrearDTO;
+import com.soyanga.soyangabackend.dto.catalogo.ProductoDTO;
 import com.soyanga.soyangabackend.repositorio.catalogo.ProductoRepositorio;
-import com.soyanga.soyangabackend.repositorio.catalogo.PresentacionProductoRepositorio; // 👈 nuevo
+import com.soyanga.soyangabackend.repositorio.catalogo.PresentacionProductoRepositorio; // 👈 se mantiene
+
 import lombok.RequiredArgsConstructor;
-
-import java.util.Locale;
-
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -93,7 +96,7 @@ public class ProductoServicio {
 
         long n = presentacionRepositorio.countByIdProducto(id);
         if (n > 0) {
-            // Sugerencia: mapea este mensaje a 409 CONFLICT en tu @ControllerAdvice
+            // Mapea este mensaje a 409 CONFLICT en tu @ControllerAdvice si lo deseas
             throw new IllegalStateException("No se puede eliminar el producto porque tiene presentaciones.");
         }
         productoRepositorio.delete(p);

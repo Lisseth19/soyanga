@@ -1,4 +1,4 @@
--- V20251027__ajustes_inventario.sql
+--V20251027__ajustes_inventario.sql
 CREATE TABLE IF NOT EXISTS ajustes_inventario (
   id_ajuste           BIGSERIAL PRIMARY KEY,
   tipo                VARCHAR(10) NOT NULL,         -- 'INGRESO' | 'EGRESO'

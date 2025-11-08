@@ -1,9 +1,10 @@
+// src/main/java/com/soyanga/soyangabackend/dto/cobros/AplicarAnticipoRespuestaDTO.java
 package com.soyanga.soyangabackend.dto.cobros;
-
 import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+// ESTE ES EL QUE SIRVE
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AplicarAnticipoRespuestaDTO {

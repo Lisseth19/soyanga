@@ -57,3 +57,32 @@ export interface Page<T> {
     size: number;
 }
 export type PageCxc = Page<CxcItem>;
+
+// === Historial de CxC ===
+export interface CxcPagoLinea {
+    idPago: number;
+    fechaPago: string;          // ISO
+    metodoDePago: 'efectivo' | 'transferencia' | string;
+    referenciaExterna?: string | null;
+    montoPagoBob: number;       // informativo (monto del pago)
+    aplicadoBob: number;        // lo aplicado a ESTA CxC
+    saldoDespues: number;       // saldo de la CxC luego de esta aplicación
+}
+
+export interface CxcDetalleDTO {
+    idCuentaCobrar: number;
+    idVenta: number;
+    idCliente?: number | null;
+    cliente?: string | null;
+
+    totalACobrar: number;
+    totalAplicado: number;
+    pendiente: number;
+
+    fechaEmision: string;       // ISO date
+    fechaVencimiento: string;   // ISO date
+    estadoCuenta: 'pendiente' | 'parcial' | 'pagado' | 'vencido' | string;
+
+    pagos: CxcPagoLinea[];
+}
+

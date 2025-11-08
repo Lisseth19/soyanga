@@ -20,4 +20,12 @@ public class VentaControlador {
     public VentaRespuestaDTO crear(@Valid @RequestBody VentaCrearDTO dto) {
         return servicio.crear(dto);
     }
+
+    // ===== NUEVO: Previsualizar próximo número sin consumir secuencia =====
+    // GET /api/v1/ventas/numeracion/proximo?tipo=boleta|factura
+    @GetMapping("/numeracion/proximo")
+    public java.util.Map<String, String> proximoNumero(@RequestParam("tipo") String tipo) {
+        String numero = servicio.peekProximoNumeroPorTipo(tipo);
+        return java.util.Collections.singletonMap("numero", numero);
+    }
 }

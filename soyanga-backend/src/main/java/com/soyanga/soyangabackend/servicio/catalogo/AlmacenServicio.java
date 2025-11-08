@@ -5,8 +5,11 @@ import com.soyanga.soyangabackend.dto.catalogo.AlmacenCrearDTO;
 import com.soyanga.soyangabackend.dto.catalogo.AlmacenEditarDTO;
 import com.soyanga.soyangabackend.dto.catalogo.AlmacenListadoProjection;
 import com.soyanga.soyangabackend.dto.catalogo.AlmacenRespuestaDTO;
+import com.soyanga.soyangabackend.dto.catalogo.PresentacionEnAlmacenDTO;
+import com.soyanga.soyangabackend.dto.catalogo.PresentacionEnAlmacenProjection;
 import com.soyanga.soyangabackend.dto.common.OpcionIdNombre;
 import com.soyanga.soyangabackend.repositorio.catalogo.AlmacenRepositorio;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -20,7 +23,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional // por defecto writable; queries abajo serán readOnly
+@Transactional // por defecto writable; marcar readOnly en queries
 public class AlmacenServicio {
 
     private final AlmacenRepositorio repo;
@@ -43,6 +46,7 @@ public class AlmacenServicio {
     @Transactional(readOnly = true)
     public List<OpcionIdNombre> opciones(boolean incluirInactivos, Long idSucursal) {
         if (idSucursal != null) {
+            // Opciones filtradas por sucursal (solo activos)
             return repo.findByIdSucursalAndEstadoActivoTrue(idSucursal).stream()
                     .map(a -> OpcionIdNombre.builder()
                             .id(a.getIdAlmacen())
@@ -50,7 +54,9 @@ public class AlmacenServicio {
                             .build())
                     .toList();
         }
-        return repo.opciones(incluirInactivos);
+        // Variante basada en repositorio unificado (preferimos la JPQL)
+        return repo.opcionesJPQL(incluirInactivos);
+        // Si prefieres la nativa, cambia a: return repo.opcionesNative(incluirInactivos);
     }
 
     /* ====================== COMANDOS ====================== */
@@ -64,7 +70,7 @@ public class AlmacenServicio {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre del almacén es obligatorio.");
         }
 
-        // Duplicado (por sucursal + nombre, case-insensitive)
+        // Duplicado por sucursal + nombre (case-insensitive)
         boolean dup = repo.existsByIdSucursalAndNombreAlmacenIgnoreCase(dto.getIdSucursal(), dto.getNombreAlmacen().trim());
         if (dup) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe un almacén con ese nombre en la sucursal.");
@@ -107,14 +113,12 @@ public class AlmacenServicio {
     }
 
     public void eliminar(Long id) {
-        // NOT FOUND temprano
         var a = repo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Almacén no encontrado: " + id));
-
         try {
             repo.deleteById(a.getIdAlmacen());
         } catch (DataIntegrityViolationException dive) {
-            // Referenciado por movimientos/inventarios/documentos → 409
+            // Referenciado por movimientos/inventarios/documentos → 409 CONFLICT
             throw new ResponseStatusException(HttpStatus.CONFLICT, "No se puede eliminar: el almacén está en uso.");
         }
     }
@@ -124,8 +128,46 @@ public class AlmacenServicio {
         if (updated == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Almacén no encontrado: " + id);
         }
-        // Reglas de negocio especiales aquí (si las necesitas):
-        // - impedir desactivar si es “almacén por defecto” y no hay reemplazo, etc.
+        // Lugar para reglas de negocio adicionales si aplican.
+    }
+
+    /* =============================== */
+    /* Presentaciones por almacén      */
+    /* =============================== */
+    @Transactional(readOnly = true)
+    public Page<PresentacionEnAlmacenDTO> listarPresentacionesEnAlmacen(
+            Long idAlmacen,
+            String q,
+            Long categoriaId,
+            Boolean soloConStock,
+            Pageable pageable
+    ) {
+        if (!repo.existsById(idAlmacen)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Almacén no encontrado: " + idAlmacen);
+        }
+        String filtro = (q == null || q.isBlank()) ? null : q.trim();
+        boolean onlyWithStock = Boolean.TRUE.equals(soloConStock);
+
+        Page<PresentacionEnAlmacenProjection> page = repo.listarPresentacionesEnAlmacen(
+                idAlmacen, filtro, categoriaId, onlyWithStock, pageable
+        );
+
+        // Mapeo completo (aprovecha todos los campos expuestos por la proyección)
+        return page.map(p -> PresentacionEnAlmacenDTO.builder()
+                .idPresentacion(p.getIdPresentacion())
+                .sku(p.getSku())
+                .producto(p.getProducto())
+                .presentacion(p.getPresentacion())   // si tu DTO lo soporta
+                .unidad(p.getUnidad())               // si tu DTO lo soporta
+                .stockDisponible(p.getStockDisponible())
+                .reservado(p.getReservado())
+                .precioBob(p.getPrecioBob())
+                .loteNumero(p.getLoteNumero())           // si tu DTO lo soporta
+                .loteVencimiento(p.getLoteVencimiento()) // si tu DTO lo soporta (YYYY-MM-DD)
+                .loteDisponible(p.getLoteDisponible())   // si tu DTO lo soporta
+                .imagenUrl(p.getImagenUrl())
+                .build()
+        );
     }
 
     /* ====================== HELPERS ====================== */
@@ -134,7 +176,7 @@ public class AlmacenServicio {
         return AlmacenRespuestaDTO.builder()
                 .idAlmacen(a.getIdAlmacen())
                 .idSucursal(a.getIdSucursal())
-                .sucursal(null) // si luego quieres el nombre, añadimos proyección con JOIN
+                .sucursal(null) // si luego quieres el nombre, añadir proyección con JOIN
                 .nombreAlmacen(a.getNombreAlmacen())
                 .descripcion(a.getDescripcion())
                 .estadoActivo(a.getEstadoActivo())
