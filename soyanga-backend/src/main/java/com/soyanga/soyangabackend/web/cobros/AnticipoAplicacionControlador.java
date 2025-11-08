@@ -21,16 +21,14 @@ public class AnticipoAplicacionControlador {
     @ResponseStatus(HttpStatus.CREATED)
     public AplicarAnticipoRespuestaDTO aplicar(
             @PathVariable Long id,
-            @Valid @RequestBody AplicarAnticipoDTO dto
-    ) {
+            @Valid @RequestBody AplicarAnticipoDTO dto) {
         return servicio.aplicar(id, dto);
     }
 
     @GetMapping("/{id}/aplicaciones")
     public org.springframework.data.domain.Page<com.soyanga.soyangabackend.dominio.AplicacionAnticipo> listarAplicaciones(
             @PathVariable("id") Long idAnticipo,
-            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable
-    ) {
-        return aplicacionRepo.findByIdAnticipoOrderByFechaAplicacionDescIdAplicacionAnticipoDesc(idAnticipo, pageable);
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return aplicacionRepo.listarPorAnticipo(idAnticipo, pageable);
     }
 }

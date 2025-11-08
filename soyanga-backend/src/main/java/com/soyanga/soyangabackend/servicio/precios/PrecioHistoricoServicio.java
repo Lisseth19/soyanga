@@ -31,29 +31,32 @@ public class PrecioHistoricoServicio {
 
     @Transactional
     public PrecioHistoricoDTO crearNuevo(Long idPresentacion, PrecioNuevoDTO dto) {
+        // 1) Fecha/hora de aplicación
         LocalDateTime inicio = dto.getFechaInicioVigencia() != null
                 ? dto.getFechaInicioVigencia()
                 : LocalDateTime.now();
 
-        // 1) Redondeo consistente con toda la app
+        // 2) Redondeo consistente
         var precioRedondeado = redondeo.aplicar(dto.getPrecioVentaBob());
 
-        // 2) Bloquear vigente (usa el finder con @Lock que pusimos en el repo)
-        var vigenteOpt = precioRepo
-                .findFirstByIdPresentacionAndFechaFinVigenciaIsNullOrderByFechaInicioVigenciaDesc(idPresentacion);
+        // 3) Quitar solapes futuros (si existía algo programado >= inicio)
+        precioRepo.deleteFuturosDesde(idPresentacion, inicio);
 
-        if (vigenteOpt.isPresent()) {
-            var vigente = vigenteOpt.get();
-            if (inicio.isBefore(vigente.getFechaInicioVigencia())) {
-                throw new IllegalArgumentException(
-                        "La fecha de inicio del nuevo precio no puede ser anterior al vigente actual");
+        // 4) Recortar el vigente EN la fecha de aplicación, si lo hubiera
+        var vigenteEnInicio = precioRepo.findVigenteEn(idPresentacion, inicio);
+        vigenteEnInicio.ifPresent(v -> {
+            // Si el vigente comienza antes/igual a 'inicio', lo cerramos 1ns antes
+            if (!inicio.isBefore(v.getFechaInicioVigencia())) {
+                v.setFechaFinVigencia(inicio);
+                precioRepo.save(v);
+            } else {
+                // Caso raro: había un registro que "se considera vigente" pero con inicio
+                // posterior.
+                // Ya lo eliminamos en el paso 3 si era futuro; aquí no hay nada más que hacer.
             }
-            // 3) Cerrar el vigente justo antes del nuevo (más preciso con nanosegundos)
-            vigente.setFechaFinVigencia(inicio.minusNanos(1));
-            precioRepo.save(vigente);
-        }
+        });
 
-        // 4) Crear el nuevo histórico
+        // 5) Crear el nuevo histórico desde 'inicio'
         var nuevo = PrecioVentaHistorico.builder()
                 .idPresentacion(idPresentacion)
                 .precioVentaBob(precioRedondeado)
@@ -63,11 +66,16 @@ public class PrecioHistoricoServicio {
                 .build();
 
         nuevo = precioRepo.save(nuevo);
+
         return toDTO(nuevo);
     }
 
     // --- Mapeo ---
     private PrecioHistoricoDTO toDTO(PrecioVentaHistorico p) {
+        var ahora = java.time.LocalDateTime.now();
+        boolean vigenteHoy = p.getFechaFinVigencia() == null
+                && !p.getFechaInicioVigencia().isAfter(ahora); // inicio <= ahora
+
         return PrecioHistoricoDTO.builder()
                 .idPrecioHistorico(p.getIdPrecioHistorico())
                 .idPresentacion(p.getIdPresentacion())
@@ -75,7 +83,7 @@ public class PrecioHistoricoServicio {
                 .fechaInicioVigencia(p.getFechaInicioVigencia())
                 .fechaFinVigencia(p.getFechaFinVigencia())
                 .motivoCambio(p.getMotivoCambio())
-                .vigente(p.getFechaFinVigencia() == null)
+                .vigente(vigenteHoy)
                 .build();
     }
 }

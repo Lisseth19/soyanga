@@ -40,14 +40,30 @@ public class GlobalExceptionHandler {
             this.errors = errors;
         }
 
-        public int getStatus() { return status; }
-        public String getError() { return error; }
-        public String getMessage() { return message; }
-        public String getPath() { return path; }
-        public String getTimestamp() { return timestamp; }
-        public Map<String, Object> getErrors() { return errors; }
-    }
+        public int getStatus() {
+            return status;
+        }
 
+        public String getError() {
+            return error;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public String getTimestamp() {
+            return timestamp;
+        }
+
+        public Map<String, Object> getErrors() {
+            return errors;
+        }
+    }
 
     private static Throwable rootCause(Throwable t) {
         Throwable r = t;
@@ -155,7 +171,6 @@ public class GlobalExceptionHandler {
 
     /* ================== Auth / permisos ================== */
 
-
     @ExceptionHandler({ BadCredentialsException.class, UsernameNotFoundException.class, AuthenticationException.class })
     public ResponseEntity<ApiError> handleCredenciales(Exception ex, HttpServletRequest req) {
         var body = new ApiError(HttpStatus.UNAUTHORIZED, "Usuario o contraseña inválidos", req.getRequestURI(), null);
@@ -190,15 +205,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
         var msg = "Parámetro inválido: " + ex.getName();
         var body = new ApiError(
-            HttpStatus.BAD_REQUEST,
-            msg,
-            req.getRequestURI(),
-            Map.of(
-                "param", ex.getName(),
-                "value", String.valueOf(ex.getValue()),
-                "requiredType", ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"
-            )
-        );
+                HttpStatus.BAD_REQUEST,
+                msg,
+                req.getRequestURI(),
+                Map.of(
+                        "param", ex.getName(),
+                        "value", String.valueOf(ex.getValue()),
+                        "requiredType",
+                        ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"));
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -216,7 +230,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    /* ================== Integridad de datos (FK / UNIQUE / NOT NULL) ================== */
+    /*
+     * ================== Integridad de datos (FK / UNIQUE / NOT NULL)
+     * ==================
+     */
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
@@ -233,30 +250,33 @@ public class GlobalExceptionHandler {
 
         // Postgres
         boolean isPgForeignKey = "23503".equals(sqlState);
-        boolean isPgUnique     = "23505".equals(sqlState);
-        boolean isPgNotNull    = "23502".equals(sqlState);
+        boolean isPgUnique = "23505".equals(sqlState);
+        boolean isPgNotNull = "23502".equals(sqlState);
 
         // MySQL
         boolean isMyForeignKey = vendorCode != null && (vendorCode == 1451 || vendorCode == 1452);
-        boolean isMyUnique     = vendorCode != null && vendorCode == 1062;
-        boolean isMyNotNull    = vendorCode != null && vendorCode == 1048;
+        boolean isMyUnique = vendorCode != null && vendorCode == 1062;
+        boolean isMyNotNull = vendorCode != null && vendorCode == 1048;
 
         // Heurísticas por mensaje
-        boolean msgForeign = low.contains("violates foreign key constraint") || low.contains("a foreign key constraint fails");
-        boolean msgUnique  = low.contains("duplicate key") || low.contains("duplicate entry");
+        boolean msgForeign = low.contains("violates foreign key constraint")
+                || low.contains("a foreign key constraint fails");
+        boolean msgUnique = low.contains("duplicate key") || low.contains("duplicate entry");
         boolean msgNotNull = low.contains("null value in column") || low.contains("cannot be null");
 
-        Map<String,Object> extra = new LinkedHashMap<>();
-        if (constraintName != null) extra.put("constraint", constraintName);
+        Map<String, Object> extra = new LinkedHashMap<>();
+        if (constraintName != null)
+            extra.put("constraint", constraintName);
 
-        // ✅ Prioridad: si el servicio ya dio un mensaje humano claro, úsalo tal cual (ej. clientes)
+        // ✅ Prioridad: si el servicio ya dio un mensaje humano claro, úsalo tal cual
+        // (ej. clientes)
         if (custom.toLowerCase(Locale.ROOT).contains("no se puede eliminar el cliente")) {
-            var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty()? null: extra);
+            var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty() ? null : extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
         // (opcional) otros mensajes específicos del servicio
         if (custom.toLowerCase(Locale.ROOT).contains("no se puede eliminar el proveedor")) {
-            var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty()? null: extra);
+            var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty() ? null : extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
 
@@ -272,7 +292,7 @@ public class GlobalExceptionHandler {
             } else if (low.contains("present") && low.contains("unidad")) {
                 friendly = "No se puede eliminar la unidad porque está en uso por presentaciones.";
             }
-            var body = new ApiError(HttpStatus.CONFLICT, friendly, req.getRequestURI(), extra.isEmpty()? null: extra);
+            var body = new ApiError(HttpStatus.CONFLICT, friendly, req.getRequestURI(), extra.isEmpty() ? null : extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
 
@@ -289,25 +309,27 @@ public class GlobalExceptionHandler {
             } else if (low.contains("simbolo")) {
                 friendly = "Ya existe una unidad con ese símbolo.";
             }
-            var body = new ApiError(HttpStatus.CONFLICT, friendly, req.getRequestURI(), extra.isEmpty()? null: extra);
+            var body = new ApiError(HttpStatus.CONFLICT, friendly, req.getRequestURI(), extra.isEmpty() ? null : extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
 
         // NOT NULL → 400
         if (isPgNotNull || isMyNotNull || msgNotNull) {
-            var body = new ApiError(HttpStatus.BAD_REQUEST, "Campo requerido ausente.", req.getRequestURI(), extra.isEmpty()? null: extra);
+            var body = new ApiError(HttpStatus.BAD_REQUEST, "Campo requerido ausente.", req.getRequestURI(),
+                    extra.isEmpty() ? null : extra);
             return ResponseEntity.badRequest().body(body);
         }
 
         // Genérico
-        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de integridad de datos", req.getRequestURI(), extra.isEmpty()? null: extra);
+        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de integridad de datos", req.getRequestURI(),
+                extra.isEmpty() ? null : extra);
         return ResponseEntity.badRequest().body(body);
     }
 
     // (si Hibernate deja pasar su ConstraintViolationException sin envolver)
     @ExceptionHandler(org.hibernate.exception.ConstraintViolationException.class)
     public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex,
-                                                              HttpServletRequest req) {
+            HttpServletRequest req) {
         String constraintName = ex.getConstraintName();
         String sqlState = null;
         Integer vendorCode = null;
@@ -315,11 +337,12 @@ public class GlobalExceptionHandler {
             sqlState = sql.getSQLState();
             vendorCode = sql.getErrorCode();
         }
-        Map<String,Object> extra = new LinkedHashMap<>();
-        if (constraintName != null) extra.put("constraint", constraintName);
+        Map<String, Object> extra = new LinkedHashMap<>();
+        if (constraintName != null)
+            extra.put("constraint", constraintName);
 
         boolean isPgForeignKey = "23503".equals(sqlState);
-        boolean isPgUnique     = "23505".equals(sqlState);
+        boolean isPgUnique = "23505".equals(sqlState);
 
         if (isPgForeignKey) {
             String msg = "No se puede completar la operación porque el registro está en uso por otros recursos.";
@@ -329,15 +352,17 @@ public class GlobalExceptionHandler {
                     msg = "No se puede eliminar la unidad porque está en uso por presentaciones.";
                 }
             }
-            var body = new ApiError(HttpStatus.CONFLICT, msg, req.getRequestURI(), extra.isEmpty()? null: extra);
+            var body = new ApiError(HttpStatus.CONFLICT, msg, req.getRequestURI(), extra.isEmpty() ? null : extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
         if (isPgUnique) {
-            var body = new ApiError(HttpStatus.CONFLICT, "Registro duplicado.", req.getRequestURI(), extra.isEmpty()? null: extra);
+            var body = new ApiError(HttpStatus.CONFLICT, "Registro duplicado.", req.getRequestURI(),
+                    extra.isEmpty() ? null : extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
 
-        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos", req.getRequestURI(), extra.isEmpty()? null: extra);
+        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos",
+                req.getRequestURI(), extra.isEmpty() ? null : extra);
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -351,7 +376,6 @@ public class GlobalExceptionHandler {
                 null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
-}
 
     /* ================== Helpers ================== */
 
@@ -360,12 +384,14 @@ public class GlobalExceptionHandler {
         final Integer vendorCode;
         final String constraintName;
         final String rawMessage;
+
         SqlInfo(String sqlState, Integer vendorCode, String constraintName, String rawMessage) {
             this.sqlState = sqlState;
             this.vendorCode = vendorCode;
             this.constraintName = constraintName;
             this.rawMessage = rawMessage;
         }
+
     }
 
     private SqlInfo extractSqlInfo(Throwable ex) {
@@ -387,9 +413,12 @@ public class GlobalExceptionHandler {
         Throwable cur = ex;
         while (cur != null) {
             if (cur instanceof SQLException sql) {
-                if (sqlState == null) sqlState = sql.getSQLState();
-                if (vendor == null) vendor = sql.getErrorCode();
-                if (raw == null || raw.isBlank()) raw = sql.getMessage();
+                if (sqlState == null)
+                    sqlState = sql.getSQLState();
+                if (vendor == null)
+                    vendor = sql.getErrorCode();
+                if (raw == null || raw.isBlank())
+                    raw = sql.getMessage();
             }
             cur = cur.getCause();
         }
@@ -397,4 +426,3 @@ public class GlobalExceptionHandler {
         return new SqlInfo(sqlState, vendor, constraint, raw);
     }
 }
-

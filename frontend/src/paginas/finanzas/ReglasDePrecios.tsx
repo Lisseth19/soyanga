@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { preciosService } from "@/servicios/precios";
 import { monedaService } from "@/servicios/moneda";
 import AjusteManualModal from "@/componentes/precios/AjusteManualModal";
@@ -64,48 +64,57 @@ export default function ReglasDePrecios() {
     return { modo: "ENTERO" };
   }, [cfg]);
 
-  const simular = async () => {
-  if (!idOrigen || !idDestino) return alert("Selecciona origen y destino");
-  setCargando(true);
-  try {
-    // Solo intento crear TC si ingresaron tasa+fecha
-    if (tasa && fecha) {
-      const existente = await preciosService.tcVigente(idOrigen, idDestino, fecha);
-      const yaExisteMismoDia = !!existente?.fechaVigencia; // hay TC para esa fecha
-      if (!yaExisteMismoDia) {
+  // --- idempotencia TC desde UI ---
+  const lastTcCreadoRef = useRef<string | null>(null);
+  const sameDay = (a?: string, b?: string) => !!a && !!b && a.slice(0, 10) === b.slice(0, 10);
+
+  const intentarCrearTC = async () => {
+    if (!tasa || !fecha || !idOrigen || !idDestino) return;
+    if (lastTcCreadoRef.current && sameDay(lastTcCreadoRef.current, fecha)) return;
+
+    const vigente = await preciosService.tcVigente(idOrigen, idDestino, fecha);
+    if (!sameDay(vigente?.fechaVigencia, fecha)) {
+      try {
         await preciosService.crearTC({
           idMonedaOrigen: idOrigen,
           idMonedaDestino: idDestino,
           fechaVigencia: fecha,
           tasaCambio: Number(tasa),
         });
+      } catch (e: any) {
+        if (!/duplicate key|llave duplicada|23505|uq_tc_par_fecha/i.test(String(e?.message || ""))) {
+          throw e;
+        }
       }
-      // Si ya existe, no hacemos nada. (Opcional: avisar al usuario)
     }
+    lastTcCreadoRef.current = fecha;
+  };
 
-    const r = await preciosService.recalcular(idOrigen, idDestino, true, "Simulación UI");
-    setImpacto(r);
-  } catch (e: any) {
-    // Si por algún motivo el backend igual lanzó la violación, la ignoras en simulación
-    const msg = String(e.message || "");
-    if (!/llave duplicada|duplicate key|uq_tc_par_fecha/i.test(msg)) {
-      alert(msg || "Error al simular");
+  const simular = async () => {
+    if (!idOrigen || !idDestino) return alert("Selecciona origen y destino");
+    setCargando(true);
+    try {
+      await intentarCrearTC();
+      const r = await preciosService.recalcular(idOrigen, idDestino, true, "Simulación UI", fecha || undefined);
+      setImpacto(r);
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      if (!/duplicate key|llave duplicada|uq_tc_par_fecha/i.test(msg)) alert(msg || "Error al simular");
+    } finally {
+      setCargando(false);
     }
-  } finally {
-    setCargando(false);
-  }
-};
-
+  };
 
   const aplicar = async () => {
     if (!idOrigen || !idDestino) return alert("Selecciona origen y destino");
     setCargando(true);
     try {
-      const r = await preciosService.recalcular(idOrigen, idDestino, false, "Re-cálculo por TC (UI)");
+      await intentarCrearTC();
+      const r = await preciosService.recalcular(idOrigen, idDestino, false, "Re-cálculo por TC (UI)", fecha || undefined);
       setImpacto(r);
       alert("Re-cálculo aplicado correctamente");
     } catch (e: any) {
-      alert(e.message || "Error al aplicar");
+      alert(e?.message || "Error al aplicar");
     } finally {
       setCargando(false);
     }
@@ -125,24 +134,22 @@ export default function ReglasDePrecios() {
   const mDestino = monedas.find((m) => m.idMoneda === idDestino);
 
   return (
-    <div className="p-6 text-slate-100">
+    <div className="p-6 text-slate-800">
       <h1 className="text-3xl font-bold mb-6">Configuración de Reglas de Precios</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Configuración TC */}
-        <div className="lg:col-span-2 rounded-2xl border border-slate-700 bg-slate-900 p-5">
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-semibold mb-4">Configuración de la Tasa de Cambio</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm opacity-80">Moneda de Origen</label>
+              <label className="text-sm text-slate-600">Moneda de Origen</label>
               <select
                 value={idOrigen ?? ""}
                 onChange={(e) => setIdOrigen(Number(e.target.value))}
-                className="w-full mt-1 rounded-lg bg-slate-800 px-3 py-2 border border-slate-700"
+                className="w-full mt-1 rounded-lg bg-white px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="" disabled>
-                  Selecciona
-                </option>
+                <option value="" disabled>Selecciona</option>
                 {monedas.map((m) => (
                   <option key={m.idMoneda} value={m.idMoneda}>
                     {m.codigo} — {m.nombre}
@@ -152,15 +159,13 @@ export default function ReglasDePrecios() {
             </div>
 
             <div>
-              <label className="text-sm opacity-80">Moneda de Destino</label>
+              <label className="text-sm text-slate-600">Moneda de Destino</label>
               <select
                 value={idDestino ?? ""}
                 onChange={(e) => setIdDestino(Number(e.target.value))}
-                className="w-full mt-1 rounded-lg bg-slate-800 px-3 py-2 border border-slate-700"
+                className="w-full mt-1 rounded-lg bg-white px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="" disabled>
-                  Selecciona
-                </option>
+                <option value="" disabled>Selecciona</option>
                 {monedas.map((m) => (
                   <option key={m.idMoneda} value={m.idMoneda}>
                     {m.codigo} — {m.nombre}
@@ -170,44 +175,38 @@ export default function ReglasDePrecios() {
             </div>
 
             <div>
-              <label className="text-sm opacity-80">Tasa de Cambio</label>
+              <label className="text-sm text-slate-600">Tasa de Cambio</label>
               <input
                 placeholder="Ej: 6.96"
                 value={tasa}
                 onChange={(e) => setTasa(e.target.value)}
-                className="w-full mt-1 rounded-lg bg-slate-800 px-3 py-2 border border-slate-700"
+                className="w-full mt-1 rounded-lg bg-white px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {mOrigen && mDestino && (
-                <div className="text-xs opacity-60 mt-1">
+                <div className="text-xs text-slate-500 mt-1">
                   {mOrigen.codigo} → {mDestino.codigo}
                 </div>
               )}
             </div>
 
             <div>
-              <label className="text-sm opacity-80">Fecha de Vigencia</label>
+              <label className="text-sm text-slate-600">Fecha de Vigencia</label>
               <input
                 type="date"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
-                className="w-full mt-1 rounded-lg bg-slate-800 px-3 py-2 border border-slate-700"
+                className="w-full mt-1 rounded-lg bg-white px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
         </div>
 
         {/* Impacto estimado */}
-        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-semibold mb-4">Impacto Estimado</h2>
           <div className="grid grid-cols-2 gap-4">
-            <Card
-              title="Precios que suben"
-              value={impacto?.items.filter((i) => (i.anterior ?? 0) < i.nuevo).length ?? 0}
-            />
-            <Card
-              title="Precios que bajan"
-              value={impacto?.items.filter((i) => (i.anterior ?? 0) > i.nuevo).length ?? 0}
-            />
+            <Card title="Precios que suben" value={impacto?.items.filter((i) => (i.anterior ?? 0) < i.nuevo).length ?? 0} />
+            <Card title="Precios que bajan" value={impacto?.items.filter((i) => (i.anterior ?? 0) > i.nuevo).length ?? 0} />
             <Card title="% Variación promedio" value={calcVariacionPromedio(impacto)} suffix="%" highlight />
             <Card title="Sin cambios" value={impacto?.iguales ?? 0} />
           </div>
@@ -215,16 +214,16 @@ export default function ReglasDePrecios() {
       </div>
 
       {/* Parámetros de redondeo */}
-      <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 p-5">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-semibold mb-4">Parámetros de Redondeo</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="text-sm opacity-80">Tipo de Redondeo</label>
+            <label className="text-sm text-slate-600">Tipo de Redondeo</label>
             <select
               value={cfg.modo}
               onChange={(e) => setCfg((c: ConfigRedondeoDTO) => ({ ...c, modo: e.target.value as any }))}
-              className="w-full mt-1 rounded-lg bg-slate-800 px-3 py-2 border border-slate-700"
+              className="w-full mt-1 rounded-lg bg-white px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ENTERO">Al entero más cercano</option>
               <option value="MULTIPLO">Al múltiplo</option>
@@ -235,32 +234,35 @@ export default function ReglasDePrecios() {
 
           {cfg.modo === "MULTIPLO" && (
             <div>
-              <label className="text-sm opacity-80">Múltiplo</label>
+              <label className="text-sm text-slate-600">Múltiplo</label>
               <input
                 type="number"
                 step="0.01"
                 value={cfg.multiplo ?? 0.5}
                 onChange={(e) => setCfg((c) => ({ ...c, multiplo: Number(e.target.value) }))}
-                className="w-full mt-1 rounded-lg bg-slate-800 px-3 py-2 border border-slate-700"
+                className="w-full mt-1 rounded-lg bg-white px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           )}
 
           {cfg.modo === "DECIMALES" && (
             <div>
-              <label className="text-sm opacity-80">Número de Decimales</label>
+              <label className="text-sm text-slate-600">Número de Decimales</label>
               <input
                 type="number"
                 value={cfg.decimales ?? 2}
                 onChange={(e) => setCfg((c) => ({ ...c, decimales: Number(e.target.value) }))}
-                className="w-full mt-1 rounded-lg bg-slate-800 px-3 py-2 border border-slate-700"
+                className="w-full mt-1 rounded-lg bg-white px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           )}
         </div>
 
         <div className="mt-4 flex gap-3">
-          <button onClick={guardarRedondeo} className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">
+          <button
+            onClick={guardarRedondeo}
+            className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300"
+          >
             Guardar parámetros
           </button>
         </div>
@@ -271,14 +273,14 @@ export default function ReglasDePrecios() {
         <button
           onClick={simular}
           disabled={cargando || !idOrigen || !idDestino}
-          className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40"
+          className="px-5 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-40"
         >
           {cargando ? "Calculando..." : "Simular impacto"}
         </button>
         <button
           onClick={aplicar}
           disabled={cargando || !idOrigen || !idDestino}
-          className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40"
+          className="px-5 py-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40"
         >
           {cargando ? "Aplicando..." : "Recalcular ahora"}
         </button>
@@ -307,9 +309,9 @@ function Card({
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
-      <div className="text-sm opacity-70">{title}</div>
-      <div className={`text-2xl font-bold ${highlight ? "text-emerald-400" : ""}`}>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-sm text-slate-600">{title}</div>
+      <div className={`text-2xl font-bold ${highlight ? "text-emerald-600" : "text-slate-900"}`}>
         {value}
         {suffix}
       </div>

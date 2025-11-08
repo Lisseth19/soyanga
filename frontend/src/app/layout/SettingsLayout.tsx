@@ -68,6 +68,8 @@ export default function SettingsLayout() {
   // Finanzas
   const canMonedas      = can("monedas:ver");
   const canTiposCambio  = can("tipos-cambio:ver");
+  const canHistorialPecios  = can("historial-precios:ver");
+  const canReglasPrecios  = can("reglas-precios:ver");
 
   // Catálogo (granular)
   const canCategorias       = can("categorias:ver");
@@ -98,6 +100,8 @@ export default function SettingsLayout() {
       // CONFIG → FINANZAS
       { path: "/config/finanzas/monedas",      label: "Monedas",        Icon: DollarSign, allowed: canMonedas,     section: "finanzas" },
       { path: "/config/finanzas/tipos-cambio", label: "Tipos de Cambio", Icon: Coins,      allowed: canTiposCambio, section: "finanzas" },
+      { path: "/config/finanzas/historial-precios", label: "Historial de Precios de Productos", Icon: Coins,      allowed: canHistorialPecios, section: "finanzas" },
+      { path: "/config/finanzas/reglas-precios", label: "Reglas de Precios", Icon: Coins,      allowed: canReglasPrecios, section: "finanzas" },
 
       // CATÁLOGO (incluye landing si aplica)
       { path: "/catalogo",                     label: "Inicio del Catálogo", Icon: Layers3,     allowed: hasCatalogoInicio, section: "catalogo" },
@@ -350,103 +354,20 @@ export default function SettingsLayout() {
   /* =========================
      RENDER FINAL
      ========================= */
+   /* =========================
+     RENDER FINAL
+     ========================= */
   return (
+    <>
+      <div className="min-h-screen overflow-x-hidden px-0 py-6">
+        {/* MOBILE (< md): sidebar arriba */}
+        <div className="md:hidden px-4 pb-4">
+          <SidebarCard />
+        </div>
 
-    <div className="px-0 py-6">{/* sin padding horizontal para pegar a la izquierda */}
-      <div className="grid grid-cols-12 gap-6 pr-6">{/* respiración a la derecha */}
-        {/* SIDEBAR (columna izquierda pegada al borde) */}
-        <aside className="col-span-12 md:col-span-3 lg:col-span-3">
-          <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700 mb-3">
-              <FolderCog size={18} /> {section === "config" ? "Configuración" : "Catálogo"}
-            </div>
-
-            {/* ====== ESTRUCTURA ====== */}
-            <button
-              type="button"
-              onClick={() => setOpenEstructura(v => !v)}
-              className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
-              aria-expanded={openEstructura}
-            >
-              <span>ESTRUCTURA</span>
-              <ChevronDown size={16} className={`transition-transform ${openEstructura ? "rotate-180" : ""}`} />
-            </button>
-            <nav className={`flex flex-col gap-1 mb-3 ${openEstructura ? "" : "hidden"}`}>
-              <NavLink to="/config/estructura/sucursales" className={itemClass}>
-                <Building2 size={16}/> Sucursales
-              </NavLink>
-              <NavLink to="/config/estructura/almacenes" className={itemClass}>
-                <Warehouse size={16}/> Almacenes
-              </NavLink>
-            </nav>
-
-            {/* ====== FINANZAS ====== */}
-            <button
-              type="button"
-              onClick={() => setOpenFinanzas(v => !v)}
-              className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
-              aria-expanded={openFinanzas}
-            >
-              <span>FINANZAS</span>
-              <ChevronDown size={16} className={`transition-transform ${openFinanzas ? "rotate-180" : ""}`} />
-            </button>
-            <nav className={`flex flex-col gap-1 mb-3 ${openFinanzas ? "" : "hidden"}`}>
-              <NavLink to="/config/finanzas/monedas" className={itemClass}>
-                <DollarSign size={16}/> Monedas
-              </NavLink>
-              <NavLink to="/config/finanzas/tipos-cambio" className={itemClass}>
-                <Coins size={16}/> Tipos de Cambio
-              </NavLink>
-              <NavLink to="/config/finanzas/historial-precios" className={itemClass}>
-                <Coins size={16}/> Historial de precios
-              </NavLink>
-              <NavLink to="/config/finanzas/reglas-precios" className={itemClass}>
-                <Coins size={16}/> Reglas de Precios
-              </NavLink>
-            </nav>
-
-            {/* ====== CATÁLOGO ====== */}
-            <button
-              type="button"
-              onClick={() => setOpenCatalogo(v => !v)}
-              className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
-              aria-expanded={openCatalogo}
-            >
-              <span>CATÁLOGO</span>
-              <ChevronDown size={16} className={`transition-transform ${openCatalogo ? "rotate-180" : ""}`} />
-            </button>
-            <nav className={`flex flex-col gap-1 ${openCatalogo ? "" : "hidden"}`}>
-              <NavLink to="/catalogo" end className={itemClass}>
-                <Layers3 size={16}/> Inicio del Catálogo
-              </NavLink>
-              <NavLink to="/catalogo/categorias" className={itemClass}>
-                <Tags size={16}/> Categorías
-              </NavLink>
-              <NavLink to="/catalogo/productos" className={itemClass}>
-                <Package size={16}/> Productos
-              </NavLink>
-              <NavLink to="/catalogo/unidades" className={itemClass}>
-                <Ruler size={16}/> Unidades de medida
-              </NavLink>
-              <NavLink to="/catalogo/presentaciones" className={itemClass}>
-                <Layers3 size={16}/> Presentaciones
-              </NavLink>
-              <NavLink to="/catalogo/codigos-barras" className={itemClass}>
-                <Barcode size={16}/> Códigos de barras
-              </NavLink>
-            </nav>
-
-      <>
-        <div className="min-h-screen overflow-x-hidden px-0 py-6">
-          {/* MOBILE (< md): sidebar normal arriba */}
-          <div className="md:hidden px-4 pb-4">
-            <SidebarCard />
-
-          </div>
-
-          {/* DESKTOP (md+): sidebar fijo como poste */}
-          <aside
-              className="
+        {/* DESKTOP (md+): sidebar fijo como poste */}
+        <aside
+          className="
             hidden
             md:block
             md:fixed
@@ -462,13 +383,13 @@ export default function SettingsLayout() {
             flex-shrink-0
             bg-transparent
           "
-          >
-            <SidebarCard />
-          </aside>
+        >
+          <SidebarCard />
+        </aside>
 
-          {/* CONTENIDO DERECHO */}
-          <section
-              className="
+        {/* CONTENIDO DERECHO */}
+        <section
+          className="
             mt-6 md:mt-0
             px-4 md:px-6 lg:px-8
             md:ml-64 lg:ml-72
@@ -476,13 +397,14 @@ export default function SettingsLayout() {
             min-w-0
             overflow-x-auto
           "
-          >
-            {safeToRenderOutlet ? <Outlet /> : <div />}
-          </section>
-        </div>
+        >
+          {safeToRenderOutlet ? <Outlet /> : <div />}
+        </section>
+      </div>
 
-        {/* Modal global Acceso Denegado */}
-        <GlobalAccessDeniedModal />
-      </>
+      {/* Modal global Acceso Denegado */}
+      <GlobalAccessDeniedModal />
+    </>
   );
 }
+
