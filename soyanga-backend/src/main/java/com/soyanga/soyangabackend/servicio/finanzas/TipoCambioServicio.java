@@ -4,10 +4,13 @@ import com.soyanga.soyangabackend.dominio.TipoDeCambio;
 import com.soyanga.soyangabackend.dto.catalogo.ConversionDTO;
 import com.soyanga.soyangabackend.dto.finanzas.*;
 import com.soyanga.soyangabackend.repositorio.catalogo.TipoDeCambioRepositorio;
+
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Service
@@ -80,5 +83,18 @@ public class TipoCambioServicio {
                 .tasaCambio(t.getTasaCambio())
                 .vigente(vigente)
                 .build();
+    }
+
+    @Transactional
+    public TipoDeCambio crearSiNoExiste(Long idOrigen, Long idDestino, LocalDate fecha, BigDecimal tasa) {
+        return repo.findByIdMonedaOrigenAndIdMonedaDestinoAndFechaVigencia(idOrigen, idDestino, fecha)
+                .orElseGet(() -> {
+                    var tc = new TipoDeCambio();
+                    tc.setIdMonedaOrigen(idOrigen);
+                    tc.setIdMonedaDestino(idDestino);
+                    tc.setFechaVigencia(fecha);
+                    tc.setTasaCambio(tasa);
+                    return repo.save(tc);
+                });
     }
 }
