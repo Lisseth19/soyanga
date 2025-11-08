@@ -18,7 +18,11 @@ import java.time.LocalDateTime;
 public class Anticipo {
 
     public enum EstadoAnticipo {
-        registrado, parcialmente_aplicado, aplicado_total, anulado
+        registrado,
+        parcialmente_aplicado,
+        aplicado_total,
+        anulado,
+        transferido_a_venta
     }
 
     @Id

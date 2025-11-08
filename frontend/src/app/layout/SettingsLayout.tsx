@@ -37,8 +37,8 @@ function itemClass({ isActive }: { isActive: boolean }) {
   return [
     "flex items-center gap-2 px-3 py-2 rounded-lg text-sm",
     isActive
-        ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-        : "text-neutral-700 hover:bg-neutral-50",
+      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+      : "text-neutral-700 hover:bg-neutral-50",
   ].join(" ");
 }
 
@@ -63,30 +63,39 @@ export default function SettingsLayout() {
      ========================= */
   // Estructura
   const canSucursales = can("sucursales:ver");
-  const canAlmacenes  = can("almacenes:ver");
+  const canAlmacenes = can("almacenes:ver");
 
   // Finanzas
-  const canMonedas      = can("monedas:ver");
-  const canTiposCambio  = can("tipos-cambio:ver");
-  const canHistorialPecios  = can("historial-precios:ver");
-  const canReglasPrecios  = can("reglas-precios:ver");
+  const canMonedas = can("monedas:ver");
+  const canTiposCambio = can("tipos-cambio:ver");
+  const canHistorialPrecios = can("historial-precios:ver"); // <- corregido el nombre
+  const canReglasPrecios = can("reglas-precios:ver");
 
   // Catálogo (granular)
-  const canCategorias       = can("categorias:ver");
-  const canProductos        = can("productos:ver");
-  const canUnidades         = can("unidades:ver");
-  const canPresentaciones   = can("presentaciones:ver");
-  const canCodigosBarras    = can("codigos-barras:ver");
+  const canCategorias = can("categorias:ver");
+  const canProductos = can("productos:ver");
+  const canUnidades = can("unidades:ver");
+  const canPresentaciones = can("presentaciones:ver");
+  const canCodigosBarras = can("codigos-barras:ver");
 
-  // ¿Existe landing de catálogo? (si quieres que SIEMPRE haya inicio al tener cualquier permiso, lo activamos)
+  // ¿Existe landing de catálogo?
   const hasAnyCatalogPerm =
-      canCategorias || canProductos || canUnidades || canPresentaciones || canCodigosBarras;
+    canCategorias ||
+    canProductos ||
+    canUnidades ||
+    canPresentaciones ||
+    canCodigosBarras;
 
-  // Si deseas que el "Inicio del Catálogo" exista siempre que haya cualquier permiso, lo marcamos allowed.
-  const hasCatalogoInicio = hasAnyCatalogPerm; // cámbialo a `can("catalogo:ver")` si más adelante lo separas
+  const hasCatalogoInicio = hasAnyCatalogPerm;
 
+  // Importante: incluir TODOS los permisos de config
   const hasAnyConfigPerm =
-      canSucursales || canAlmacenes || canMonedas || canTiposCambio;
+    canSucursales ||
+    canAlmacenes ||
+    canMonedas ||
+    canTiposCambio ||
+    canHistorialPrecios ||
+    canReglasPrecios;
 
   /* =========================
      RUTAS (SSoT)
@@ -94,72 +103,177 @@ export default function SettingsLayout() {
   const routes: RouteDef[] = useMemo(() => {
     const arr: RouteDef[] = [
       // CONFIG → ESTRUCTURA
-      { path: "/config/estructura/sucursales", label: "Sucursales", Icon: Building2, allowed: canSucursales, section: "estructura" },
-      { path: "/config/estructura/almacenes",  label: "Almacenes",  Icon: Warehouse,  allowed: canAlmacenes,  section: "estructura" },
+      {
+        path: "/config/estructura/sucursales",
+        label: "Sucursales",
+        Icon: Building2,
+        allowed: canSucursales,
+        section: "estructura",
+      },
+      {
+        path: "/config/estructura/almacenes",
+        label: "Almacenes",
+        Icon: Warehouse,
+        allowed: canAlmacenes,
+        section: "estructura",
+      },
 
       // CONFIG → FINANZAS
-      { path: "/config/finanzas/monedas",      label: "Monedas",        Icon: DollarSign, allowed: canMonedas,     section: "finanzas" },
-      { path: "/config/finanzas/tipos-cambio", label: "Tipos de Cambio", Icon: Coins,      allowed: canTiposCambio, section: "finanzas" },
-      { path: "/config/finanzas/historial-precios", label: "Historial de Precios de Productos", Icon: Coins,      allowed: canHistorialPecios, section: "finanzas" },
-      { path: "/config/finanzas/reglas-precios", label: "Reglas de Precios", Icon: Coins,      allowed: canReglasPrecios, section: "finanzas" },
+      {
+        path: "/config/finanzas/monedas",
+        label: "Monedas",
+        Icon: DollarSign,
+        allowed: canMonedas,
+        section: "finanzas",
+      },
+      {
+        path: "/config/finanzas/tipos-cambio",
+        label: "Tipos de Cambio",
+        Icon: Coins,
+        allowed: canTiposCambio,
+        section: "finanzas",
+      },
+      {
+        path: "/config/finanzas/historial-precios",
+        label: "Historial de Precios de Productos",
+        Icon: Coins,
+        allowed: canHistorialPrecios,
+        section: "finanzas",
+      },
+      {
+        path: "/config/finanzas/reglas-precios",
+        label: "Reglas de Precios",
+        Icon: Coins,
+        allowed: canReglasPrecios,
+        section: "finanzas",
+      },
 
       // CATÁLOGO (incluye landing si aplica)
-      { path: "/catalogo",                     label: "Inicio del Catálogo", Icon: Layers3,     allowed: hasCatalogoInicio, section: "catalogo" },
-      { path: "/catalogo/categorias",          label: "Categorías",          Icon: Tags,        allowed: canCategorias,     section: "catalogo" },
-      { path: "/catalogo/productos",           label: "Productos",           Icon: Package,     allowed: canProductos,      section: "catalogo" },
-      { path: "/catalogo/unidades",            label: "Unidades de medida",  Icon: Ruler,       allowed: canUnidades,       section: "catalogo" },
-      { path: "/catalogo/presentaciones",      label: "Presentaciones",      Icon: Layers3,     allowed: canPresentaciones, section: "catalogo" },
-      { path: "/catalogo/codigos-barras",      label: "Códigos de barras",   Icon: Barcode,     allowed: canCodigosBarras,  section: "catalogo" },
+      {
+        path: "/catalogo",
+        label: "Inicio del Catálogo",
+        Icon: Layers3,
+        allowed: hasCatalogoInicio,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/categorias",
+        label: "Categorías",
+        Icon: Tags,
+        allowed: canCategorias,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/productos",
+        label: "Productos",
+        Icon: Package,
+        allowed: canProductos,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/unidades",
+        label: "Unidades de medida",
+        Icon: Ruler,
+        allowed: canUnidades,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/presentaciones",
+        label: "Presentaciones",
+        Icon: Layers3,
+        allowed: canPresentaciones,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/codigos-barras",
+        label: "Códigos de barras",
+        Icon: Barcode,
+        allowed: canCodigosBarras,
+        section: "catalogo",
+      },
     ];
     return arr;
   }, [
-    canSucursales, canAlmacenes,
-    canMonedas, canTiposCambio,
-    canCategorias, canProductos, canUnidades, canPresentaciones, canCodigosBarras,
+    canSucursales,
+    canAlmacenes,
+    canMonedas,
+    canTiposCambio,
+    canHistorialPrecios,
+    canReglasPrecios,
+    canCategorias,
+    canProductos,
+    canUnidades,
+    canPresentaciones,
+    canCodigosBarras,
     hasCatalogoInicio,
   ]);
 
   /* =========================
      ACORDEONES (sin || true) + sincronizados
      ========================= */
-  const startsEstructura = useMemo(() => pathname.startsWith("/config/estructura"), [pathname]);
-  const startsFinanzas   = useMemo(() => pathname.startsWith("/config/finanzas"),   [pathname]);
-  const startsCatalogo   = useMemo(() => pathname.startsWith("/catalogo"),          [pathname]);
+  const startsEstructura = useMemo(
+    () => pathname.startsWith("/config/estructura"),
+    [pathname]
+  );
+  const startsFinanzas = useMemo(
+    () => pathname.startsWith("/config/finanzas"),
+    [pathname]
+  );
+  const startsCatalogo = useMemo(
+    () => pathname.startsWith("/catalogo"),
+    [pathname]
+  );
 
-  const [openEstructura, setOpenEstructura] = useState<boolean>(startsEstructura || (!startsFinanzas && !startsCatalogo));
-  const [openFinanzas,   setOpenFinanzas]   = useState<boolean>(startsFinanzas);
-  const [openCatalogo,   setOpenCatalogo]   = useState<boolean>(startsCatalogo);
+  const [openEstructura, setOpenEstructura] = useState<boolean>(
+    startsEstructura || (!startsFinanzas && !startsCatalogo)
+  );
+  const [openFinanzas, setOpenFinanzas] = useState<boolean>(startsFinanzas);
+  const [openCatalogo, setOpenCatalogo] = useState<boolean>(startsCatalogo);
 
-  useEffect(() => { setOpenEstructura(startsEstructura || (!startsFinanzas && !startsCatalogo)); }, [startsEstructura, startsFinanzas, startsCatalogo]);
-  useEffect(() => { setOpenFinanzas(startsFinanzas); }, [startsFinanzas]);
-  useEffect(() => { setOpenCatalogo(startsCatalogo); }, [startsCatalogo]);
+  useEffect(() => {
+    setOpenEstructura(
+      startsEstructura || (!startsFinanzas && !startsCatalogo)
+    );
+  }, [startsEstructura, startsFinanzas, startsCatalogo]);
+  useEffect(() => {
+    setOpenFinanzas(startsFinanzas);
+  }, [startsFinanzas]);
+  useEffect(() => {
+    setOpenCatalogo(startsCatalogo);
+  }, [startsCatalogo]);
 
   /* =========================
      HELPERS DERIVADOS (por módulo)
      ========================= */
-  const configRoutes   = useMemo(() => routes.filter(r => r.section !== "catalogo"), [routes]);
-  const catalogoRoutes = useMemo(() => routes.filter(r => r.section === "catalogo"), [routes]);
+  const configRoutes = useMemo(
+    () => routes.filter((r) => r.section !== "catalogo"),
+    [routes]
+  );
+  const catalogoRoutes = useMemo(
+    () => routes.filter((r) => r.section === "catalogo"),
+    [routes]
+  );
 
   const firstAllowedConfig = useMemo(
-      () => configRoutes.find(r => r.allowed)?.path ?? null,
-      [configRoutes]
+    () => configRoutes.find((r) => r.allowed)?.path ?? null,
+    [configRoutes]
   );
 
   const firstAllowedCatalog = useMemo(
-      () => catalogoRoutes.find(r => r.allowed)?.path ?? null,
-      [catalogoRoutes]
+    () => catalogoRoutes.find((r) => r.allowed)?.path ?? null,
+    [catalogoRoutes]
   );
 
   const isAllowedPath = useCallback(
-      (p: string): boolean => {
-        // Permitir roots (se resuelven con redirect abajo)
-        if (p === "/config" || p === "/config/")   return true;
-        if (p === "/catalogo" || p === "/catalogo/") return true;
+    (p: string): boolean => {
+      // Permitir roots (se resuelven con redirect abajo)
+      if (p === "/config" || p === "/config/") return true;
+      if (p === "/catalogo" || p === "/catalogo/") return true;
 
-        // Cualquier subruta debe coincidir con una ruta conocida y permitida
-        return routes.some(r => p.startsWith(r.path) && r.allowed);
-      },
-      [routes]
+      // Cualquier subruta debe coincidir con una ruta conocida y permitida
+      return routes.some((r) => p.startsWith(r.path) && r.allowed);
+    },
+    [routes]
   );
 
   /* =========================
@@ -225,136 +339,137 @@ export default function SettingsLayout() {
      CONTROL DE RENDER DEL OUTLET
      ========================= */
   const safeToRenderOutlet =
-      isAllowedPath(pathname) ||
-      pathname === "/config" ||
-      pathname === "/config/" ||
-      pathname === "/catalogo" ||
-      pathname === "/catalogo/";
+    isAllowedPath(pathname) ||
+    pathname === "/config" ||
+    pathname === "/config/" ||
+    pathname === "/catalogo" ||
+    pathname === "/catalogo/";
 
   /* =========================
      Sidebar reusable content
      ========================= */
   function SidebarCard() {
     // Helpers por sección (para mostrar u ocultar acordeones)
-    const hasEstructura = configRoutes.some(r => r.section === "estructura" && r.allowed);
-    const hasFinanzas   = configRoutes.some(r => r.section === "finanzas"   && r.allowed);
-    const hasCatalogo   = catalogoRoutes.some(r => r.allowed);
+    const hasEstructura = configRoutes.some(
+      (r) => r.section === "estructura" && r.allowed
+    );
+    const hasFinanzas = configRoutes.some(
+      (r) => r.section === "finanzas" && r.allowed
+    );
+    const hasCatalogo = catalogoRoutes.some((r) => r.allowed);
 
     return (
-        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700 mb-3">
-            <FolderCog size={18} />
-            {isCatalogo ? "Catálogo" : "Configuración"}
-          </div>
-
-          {/* ====== ESTRUCTURA ====== */}
-          {hasEstructura && (
-              <>
-                <button
-                    type="button"
-                    onClick={() => setOpenEstructura(v => !v)}
-                    className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
-                    aria-expanded={openEstructura}
-                    aria-controls="settings-estructura-nav"
-                >
-                  <span>ESTRUCTURA</span>
-                  <ChevronDown
-                      size={16}
-                      className={`transition-transform ${openEstructura ? "rotate-180" : ""}`}
-                  />
-                </button>
-
-                <nav
-                    id="settings-estructura-nav"
-                    className={`flex flex-col gap-1 mb-3 ${openEstructura ? "" : "hidden"}`}
-                >
-                  {configRoutes
-                      .filter(r => r.section === "estructura" && r.allowed)
-                      .map(({ path, label, Icon }) => (
-                          <NavLink key={path} to={path} className={itemClass}>
-                            <Icon size={16} /> {label}
-                          </NavLink>
-                      ))}
-                </nav>
-              </>
-          )}
-
-          {/* ====== FINANZAS ====== */}
-          {hasFinanzas && (
-              <>
-                <button
-                    type="button"
-                    onClick={() => setOpenFinanzas(v => !v)}
-                    className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
-                    aria-expanded={openFinanzas}
-                    aria-controls="settings-finanzas-nav"
-                >
-                  <span>FINANZAS</span>
-                  <ChevronDown
-                      size={16}
-                      className={`transition-transform ${openFinanzas ? "rotate-180" : ""}`}
-                  />
-                </button>
-
-                <nav
-                    id="settings-finanzas-nav"
-                    className={`flex flex-col gap-1 mb-3 ${openFinanzas ? "" : "hidden"}`}
-                >
-                  {configRoutes
-                      .filter(r => r.section === "finanzas" && r.allowed)
-                      .map(({ path, label, Icon }) => (
-                          <NavLink key={path} to={path} className={itemClass}>
-                            <Icon size={16} /> {label}
-                          </NavLink>
-                      ))}
-                </nav>
-              </>
-          )}
-
-          {/* ====== CATÁLOGO ====== */}
-          {hasCatalogo && (
-              <>
-                <button
-                    type="button"
-                    onClick={() => setOpenCatalogo(v => !v)}
-                    className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
-                    aria-expanded={openCatalogo}
-                    aria-controls="settings-catalogo-nav"
-                >
-                  <span>CATÁLOGO</span>
-                  <ChevronDown
-                      size={16}
-                      className={`transition-transform ${openCatalogo ? "rotate-180" : ""}`}
-                  />
-                </button>
-
-                <nav
-                    id="settings-catalogo-nav"
-                    className={`flex flex-col gap-1 ${openCatalogo ? "" : "hidden"}`}
-                >
-                  {catalogoRoutes
-                      .filter(r => r.allowed)
-                      .map(({ path, label, Icon }) => (
-                          <NavLink
-                              key={path}
-                              to={path}
-                              end={path === "/catalogo"} // evita activo en subrutas
-                              className={itemClass}
-                          >
-                            <Icon size={16} /> {label}
-                          </NavLink>
-                      ))}
-                </nav>
-              </>
-          )}
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700 mb-3">
+          <FolderCog size={18} />
+          {isCatalogo ? "Catálogo" : "Configuración"}
         </div>
+
+        {/* ====== ESTRUCTURA ====== */}
+        {hasEstructura && (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpenEstructura((v) => !v)}
+              className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
+              aria-expanded={openEstructura}
+              aria-controls="settings-estructura-nav"
+            >
+              <span>ESTRUCTURA</span>
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${openEstructura ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            <nav
+              id="settings-estructura-nav"
+              className={`flex flex-col gap-1 mb-3 ${openEstructura ? "" : "hidden"}`}
+            >
+              {configRoutes
+                .filter((r) => r.section === "estructura" && r.allowed)
+                .map(({ path, label, Icon }) => (
+                  <NavLink key={path} to={path} className={itemClass}>
+                    <Icon size={16} /> {label}
+                  </NavLink>
+                ))}
+            </nav>
+          </>
+        )}
+
+        {/* ====== FINANZAS ====== */}
+        {hasFinanzas && (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpenFinanzas((v) => !v)}
+              className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
+              aria-expanded={openFinanzas}
+              aria-controls="settings-finanzas-nav"
+            >
+              <span>FINANZAS</span>
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${openFinanzas ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            <nav
+              id="settings-finanzas-nav"
+              className={`flex flex-col gap-1 mb-3 ${openFinanzas ? "" : "hidden"}`}
+            >
+              {configRoutes
+                .filter((r) => r.section === "finanzas" && r.allowed)
+                .map(({ path, label, Icon }) => (
+                  <NavLink key={path} to={path} className={itemClass}>
+                    <Icon size={16} /> {label}
+                  </NavLink>
+                ))}
+            </nav>
+          </>
+        )}
+
+        {/* ====== CATÁLOGO ====== */}
+        {hasCatalogo && (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpenCatalogo((v) => !v)}
+              className="w-full text-left text-xs font-semibold text-neutral-500 uppercase mb-1 px-1 py-1 rounded-md hover:bg-neutral-50 flex items-center justify-between"
+              aria-expanded={openCatalogo}
+              aria-controls="settings-catalogo-nav"
+            >
+              <span>CATÁLOGO</span>
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${openCatalogo ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            <nav
+              id="settings-catalogo-nav"
+              className={`flex flex-col gap-1 ${openCatalogo ? "" : "hidden"}`}
+            >
+              {catalogoRoutes
+                .filter((r) => r.allowed)
+                .map(({ path, label, Icon }) => (
+                  <NavLink
+                    key={path}
+                    to={path}
+                    end={path === "/catalogo"} // evita activo en subrutas
+                    className={itemClass}
+                  >
+                    <Icon size={16} /> {label}
+                  </NavLink>
+                ))}
+            </nav>
+          </>
+        )}
+      </div>
     );
   }
 
   /* =========================
-     RENDER FINAL
-     ========================= */
-   /* =========================
      RENDER FINAL
      ========================= */
   return (
@@ -407,4 +522,3 @@ export default function SettingsLayout() {
     </>
   );
 }
-

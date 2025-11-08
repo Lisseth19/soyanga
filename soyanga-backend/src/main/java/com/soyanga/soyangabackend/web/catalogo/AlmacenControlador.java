@@ -4,6 +4,7 @@ import com.soyanga.soyangabackend.dto.catalogo.AlmacenCrearDTO;
 import com.soyanga.soyangabackend.dto.catalogo.AlmacenEditarDTO;
 import com.soyanga.soyangabackend.dto.catalogo.AlmacenListadoProjection;
 import com.soyanga.soyangabackend.dto.catalogo.AlmacenRespuestaDTO;
+import com.soyanga.soyangabackend.dto.catalogo.PresentacionEnAlmacenDTO;
 import com.soyanga.soyangabackend.dto.common.EstadoRequest;
 import com.soyanga.soyangabackend.dto.common.OpcionIdNombre;
 import com.soyanga.soyangabackend.servicio.catalogo.AlmacenServicio;
@@ -28,7 +29,8 @@ public class AlmacenControlador {
 
     /**
      * Listado paginado con búsqueda, filtro por sucursal y opción de incluir inactivos.
-     * Admite sort/size/page desde el cliente (Pageable).
+     * Admite sort/size/page desde el cliente (Pageable). También soporta los query params
+     * page y size estándar de Spring Data.
      */
     @GetMapping
     public Page<AlmacenListadoProjection> listar(
@@ -50,6 +52,10 @@ public class AlmacenControlador {
         return servicio.obtener(id);
     }
 
+    /**
+     * Opciones para combos (id + nombre).
+     * Soporta incluirInactivos/soloActivos e idSucursal.
+     */
     @GetMapping("/opciones")
     public List<OpcionIdNombre> opciones(
             @RequestParam(required = false) Boolean incluirInactivos,
@@ -89,12 +95,28 @@ public class AlmacenControlador {
     }
 
     /**
-     * Eliminar: se recomienda que el servicio lance 409 (CONFLICT) si el almacén está en uso.
+     * Eliminar: el servicio debe lanzar 409 (CONFLICT) si el almacén está en uso.
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@perms.tiene(authentication, 'almacenes:eliminar')")
     public void eliminar(@PathVariable Long id) {
         servicio.eliminar(id);
+    }
+
+    /**
+     * Presentaciones/productos visibles en un almacén (paginado).
+     * Parámetros opcionales: q, categoriaId, soloConStock (default=true).
+     * La paginación se maneja con Pageable (page/size).
+     */
+    @GetMapping("/{id}/presentaciones")
+    public Page<PresentacionEnAlmacenDTO> listarPresentacionesPublico(
+            @PathVariable("id") Long idAlmacen,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false, defaultValue = "true") Boolean soloConStock,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        return servicio.listarPresentacionesEnAlmacen(idAlmacen, q, categoriaId, soloConStock, pageable);
     }
 }

@@ -7,7 +7,8 @@ import com.soyanga.soyangabackend.dto.catalogo.CategoriaDTO;
 import com.soyanga.soyangabackend.dto.common.OpcionIdNombre;
 import com.soyanga.soyangabackend.repositorio.catalogo.CategoriaProductoRepositorio;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,8 @@ import java.util.Locale;
 public class CategoriaServicio {
 
     private final CategoriaProductoRepositorio repo;
+
+    /* ====================== QUERIES ====================== */
 
     @Transactional(readOnly = true)
     public Page<CategoriaDTO> buscar(String q, Long idPadre, boolean soloRaices, Pageable pageable) {
@@ -42,12 +45,16 @@ public class CategoriaServicio {
         return toDTO(c);
     }
 
+    /* ====================== COMANDOS ====================== */
+
     @Transactional
     public CategoriaDTO crear(CategoriaCrearDTO dto) {
         Long idPadre = dto.getIdCategoriaPadre();
+
+        // Validar existencia del padre si se envía
         if (idPadre != null) {
-            // valida existencia del padre si se envía
-            repo.findById(idPadre).orElseThrow(() -> new IllegalArgumentException("Categoría padre no existe: " + idPadre));
+            repo.findById(idPadre).orElseThrow(
+                    () -> new IllegalArgumentException("Categoría padre no existe: " + idPadre));
         }
 
         var c = CategoriaProducto.builder()
@@ -77,7 +84,8 @@ public class CategoriaServicio {
                 if (id.equals(idPadre)) {
                     throw new IllegalArgumentException("Una categoría no puede ser su propio padre.");
                 }
-                repo.findById(idPadre).orElseThrow(() -> new IllegalArgumentException("Categoría padre no existe: " + idPadre));
+                repo.findById(idPadre).orElseThrow(
+                        () -> new IllegalArgumentException("Categoría padre no existe: " + idPadre));
             }
             c.setIdCategoriaPadre(idPadre);
         }
@@ -88,21 +96,25 @@ public class CategoriaServicio {
 
     @Transactional
     public void eliminar(Long id) {
-        // Si debes proteger por FK, haz soft-delete: setEstadoActivo(false) en lugar de delete
+        // Si debes proteger por FK, haz soft-delete (estado) en vez de delete.
         repo.deleteById(id);
     }
 
-    /** Activar/Desactivar (usado por el controlador) */
+    /** Activar/Desactivar (si tu entidad tiene estadoActivo). */
     @Transactional
     public CategoriaDTO cambiarEstado(Long id, boolean activo) {
         var c = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Categoría no encontrada: " + id));
 
+        // Descomenta/ajusta si tu entidad posee el campo:
+        // c.setEstadoActivo(activo);
+
         c = repo.save(c);
         return toDTO(c);
     }
 
-    // ===== Helpers =====
+    /* ====================== HELPERS ====================== */
+
     private String nullIfBlank(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
     }
@@ -113,7 +125,7 @@ public class CategoriaServicio {
                 .nombreCategoria(c.getNombreCategoria())
                 .descripcion(c.getDescripcion())
                 .idCategoriaPadre(c.getIdCategoriaPadre())
-                // expón estado si tu DTO lo tiene:
+                // Si tu DTO maneja estado, añade:
                 // .estadoActivo(Boolean.TRUE.equals(c.getEstadoActivo()))
                 .build();
     }

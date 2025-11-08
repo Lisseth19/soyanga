@@ -1,9 +1,11 @@
+// src/servicios/cobros.ts
 import { http } from "@/servicios/httpClient";
 import type {
     CxcItem,
     PagoCrearDTO, PagoRespuestaDTO,
     PagoAplicarDTO, PagoAplicarRespuestaDTO,
     Page,
+    CxcDetalleDTO,
 } from "@/types/cobros";
 
 const BASE = "/v1/cobros";
@@ -18,10 +20,11 @@ function clean<T extends Record<string, unknown>>(obj?: T): T | undefined {
     return out as T;
 }
 
-function toIsoDateTime(d?: string, isEnd = false) {
-    if (!d) return undefined;
-    if (d.includes("T")) return d;
-    return isEnd ? `${d}T23:59:59` : `${d}T00:00:00`;
+// ⬇️ El backend espera LocalDate. Enviamos SOLO "YYYY-MM-DD".
+function onlyDate(s?: string) {
+    if (!s) return undefined;
+    const i = s.indexOf("T");
+    return i > 0 ? s.slice(0, i) : s;
 }
 
 export const cobrosService = {
@@ -29,17 +32,17 @@ export const cobrosService = {
     listarCxc(params: {
         soloAbiertas?: boolean;
         clienteId?: number;
-        emisionDesde?: string; // YYYY-MM-DD o ISO
-        emisionHasta?: string; // YYYY-MM-DD o ISO
-        venceAntes?: string;   // YYYY-MM-DD o ISO
+        emisionDesde?: string; // YYYY-MM-DD
+        emisionHasta?: string; // YYYY-MM-DD
+        venceAntes?: string;   // YYYY-MM-DD
         page?: number;
         size?: number;
     }): Promise<Page<CxcItem>> {
         const q = clean({
             ...params,
-            emisionDesde: toIsoDateTime(params?.emisionDesde, false),
-            emisionHasta: toIsoDateTime(params?.emisionHasta, true),
-            venceAntes: toIsoDateTime(params?.venceAntes, true),
+            emisionDesde: onlyDate(params?.emisionDesde),
+            emisionHasta: onlyDate(params?.emisionHasta),
+            venceAntes:   onlyDate(params?.venceAntes),
         });
         return http.get<Page<CxcItem>>(`${BASE}/cxc`, { params: q });
     },
@@ -48,6 +51,21 @@ export const cobrosService = {
     obtenerCxcPorVenta(ventaId: number): Promise<CxcItem | null> {
         return http
             .get<CxcItem>(`${BASE}/cxc-por-venta`, { params: { ventaId } } as any)
+            .catch((e: any) => {
+                if (e?.response?.status === 204) return null;
+                throw e;
+            });
+    },
+
+    /** GET /v1/cobros/cxc/{id}/detalle */
+    obtenerCxcDetalle(idCxc: number): Promise<CxcDetalleDTO> {
+        return http.get<CxcDetalleDTO>(`${BASE}/cxc/${idCxc}/detalle`);
+    },
+
+    /** GET /v1/cobros/cxc/detalle-por-venta?ventaId=...  (puede retornar 204) */
+    obtenerCxcDetallePorVenta(ventaId: number): Promise<CxcDetalleDTO | null> {
+        return http
+            .get<CxcDetalleDTO>(`${BASE}/cxc/detalle-por-venta`, { params: { ventaId } } as any)
             .catch((e: any) => {
                 if (e?.response?.status === 204) return null;
                 throw e;

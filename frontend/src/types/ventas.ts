@@ -16,18 +16,20 @@ export type Page<T> = {
 };
 
 // ------- LISTADO (proyección del backend) -------
-export type VentaListado = {
+export interface VentaListado {
     idVenta: number;
     fechaVenta: string;
     idCliente: number | null;
-    cliente: string | null;
-    estadoVenta: VentaEstado | string;
-    tipoDocumentoTributario: TipoDocumentoTributario | string;
+    cliente: string;
+    estadoVenta: 'borrador' | 'confirmada' | 'despachada' | 'anulada';
+    tipoDocumentoTributario: 'boleta' | 'factura';
     numeroDocumento: string | null;
-    metodoDePago: MetodoPago | string;
-    condicionDePago: CondicionPago | string;
-    totalNetoBob: number;
-    cxcPendienteBob: number;
+    metodoDePago: 'efectivo' | 'transferencia' | 'mixto';
+    condicionDePago: 'contado' | 'credito';
+    totalNetoBob: number;          // Neto (ya incluye impuesto si es FACTURA)
+    cxcPendienteBob?: number | null; // Pendiente vivo (baja con pagos)
+    interesCredito?: number | null;  // 👈 NUEVO, porcentaje (ej: 10 = 10%)
+
 };
 
 // ------- CREAR -------
@@ -39,8 +41,8 @@ export type VentaItemCrear = {
     descuentoMontoBob?: number;
 };
 
-// src/types/ventas.ts
 export type VentaCrearDTO = {
+    fechaVenta?: string | null; // ISO opcional
     idCliente?: number | null;
     tipoDocumentoTributario: TipoDocumentoTributario; // 'boleta' | 'factura'
     condicionDePago: CondicionPago;                   // 'contado' | 'credito'
@@ -49,17 +51,19 @@ export type VentaCrearDTO = {
     metodoDePago?: MetodoPago;
     observaciones?: string | null;
     items: VentaItemCrear[];
-    // 👇 NUEVOS
-    impuestoId?: number | null;       // requerido si factura
-    interesCredito?: number | null;   // opcional si crédito
+    // nuevos/confirmados
+    impuestoId?: number | null;       // requerido si factura (si no envías, el back toma 1 activo)
+    interesCredito?: number | null;   // porcentaje fijo si crédito (ej. 5 = 5%)
 };
-
 
 export type VentaCrearRespuesta = {
     idVenta: number;
     totalBrutoBob: number;
     descuentoTotalBob: number;
-    totalNetoBob: number;
+    totalNetoBob: number; // incluye impuesto si factura
+    impuestoPorcentaje?: number | null;
+    impuestoMontoBob?: number | null;
+    interesCredito?: number | null;   // % reportado
     asignaciones?: Array<{
         idPresentacion: number;
         sku?: string | null;
@@ -79,18 +83,28 @@ export type VentaDetalleRespuestaDTO = {
     estadoVenta: VentaEstado | string;
     tipoDocumentoTributario: TipoDocumentoTributario | string;
     numeroDocumento: string | null;
+
     idCliente: number | null;
     cliente: string | null;
+
     idMoneda: number;
     totalBrutoBob: number;
     descuentoTotalBob: number;
     totalNetoBob: number;
+
     metodoDePago: MetodoPago | string;
     condicionDePago: CondicionPago | string;
     fechaVencimientoCredito?: string | null;
+
     idAlmacenDespacho: number;
     observaciones?: string | null;
-    cxc?: {
+
+    // NUEVO: para mostrar interés fijo aplicado a la CxC
+    interesCreditoPct?: number | null;    // %
+    interesCreditoMonto?: number | null;  // totalNeto * pct/100
+    totalCobrarBob?: number | null;       // totalNeto + interes
+
+    cxc: {
         idCuentaCobrar: number;
         estadoCuenta: string;
         montoPendienteBob: number;
@@ -99,6 +113,7 @@ export type VentaDetalleRespuestaDTO = {
         totalPagosAplicadosBob: number;
         totalAnticiposAplicadosBob: number;
     } | null;
+
     items: Array<{
         idVentaDetalle: number;
         idPresentacion: number;
@@ -113,7 +128,7 @@ export type VentaDetalleRespuestaDTO = {
     }>;
 };
 
-// ------- TRAZABILIDAD -------
+// ------- TRAZABILIDAD (sin cambios funcionales) -------
 export type VentaTrazabilidadDTO = {
     idVenta: number;
     fechaVenta: string;

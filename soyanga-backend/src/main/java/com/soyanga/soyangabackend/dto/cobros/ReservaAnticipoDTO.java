@@ -1,28 +1,31 @@
+// src/main/java/com/soyanga/soyangabackend/dto/cobros/ReservaAnticipoDTO.java
 package com.soyanga.soyangabackend.dto.cobros;
 
-import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ReservaAnticipoDTO {
 
-    @NotNull(message = "items es requerido")
+    @NotEmpty
     private List<Item> items;
 
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public List<Item> getItems() { return items; }
+    public void setItems(List<Item> items) { this.items = items; }
+
     public static class Item {
-        @NotNull(message = "idPresentacion es requerido")
-        private Long idPresentacion;
+        @NotNull private Long idPresentacion;
+        @NotNull private Long idAlmacen;
+        @NotNull @Positive private BigDecimal cantidad;
 
-        @NotNull(message = "idAlmacen es requerido")
-        private Long idAlmacen;
-
-        @NotNull(message = "cantidad es requerida")
-        @DecimalMin(value = "0.000001", message = "cantidad debe ser > 0")
-        private BigDecimal cantidad;
+        public Long getIdPresentacion() { return idPresentacion; }
+        public void setIdPresentacion(Long idPresentacion) { this.idPresentacion = idPresentacion; }
+        public Long getIdAlmacen() { return idAlmacen; }
+        public void setIdAlmacen(Long idAlmacen) { this.idAlmacen = idAlmacen; }
+        public BigDecimal getCantidad() { return cantidad; }
+        public void setCantidad(BigDecimal cantidad) { this.cantidad = cantidad; }
     }
 }

@@ -55,4 +55,32 @@ public interface AnticipoRepositorio extends JpaRepository<Anticipo, Long> {
             @Param("hasta") LocalDateTime hasta,
             Pageable pageable
     );
+
+
+    // ===== NUEVO: proyección mínima para reservas vigentes por anticipo =====
+    public interface ReservaVigenteRowMin {
+        Long getIdAlmacen();
+        Long getIdPresentacion();
+        Long getIdLote();
+        java.math.BigDecimal getCantidad();
+    }
+
+    @Query(value = """
+    SELECT
+      COALESCE(m.id_almacen_origen, m.id_almacen_destino)                 AS idAlmacen,
+      l.id_presentacion                                                   AS idPresentacion,
+      m.id_lote                                                           AS idLote,
+      SUM(CASE WHEN m.tipo_movimiento = 'reserva_anticipo'
+               THEN m.cantidad ELSE -m.cantidad END)                      AS cantidad
+    FROM movimientos_de_inventario m
+    JOIN lotes l ON l.id_lote = m.id_lote
+    WHERE m.referencia_modulo = 'anticipo'
+      AND m.id_referencia = :idAnticipo
+    GROUP BY COALESCE(m.id_almacen_origen, m.id_almacen_destino), l.id_presentacion, m.id_lote
+    HAVING SUM(CASE WHEN m.tipo_movimiento = 'reserva_anticipo'
+                    THEN m.cantidad ELSE -m.cantidad END) > 0
+    ORDER BY idAlmacen, idPresentacion, idLote
+    """, nativeQuery = true)
+    java.util.List<ReservaVigenteRowMin> reservasVigentesMin(@Param("idAnticipo") Long idAnticipo);
+
 }
