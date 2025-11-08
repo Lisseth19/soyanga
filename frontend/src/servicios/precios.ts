@@ -34,10 +34,17 @@ export const preciosService = {
     }),
 
   /* ---------- Recalcular ---------- */
-  recalcular: (idMonedaOrigen: number, idMonedaDestino: number, simular: boolean, motivo?: string) =>
-    http.post<ResumenRecalculo>(`${BASE_PRECIOS}/recalcular`, undefined, {
-      params: clean({ idMonedaOrigen, idMonedaDestino, simular, motivo }),
-    }),
+  recalcular: (
+  idMonedaOrigen: number,
+  idMonedaDestino: number,
+  simular: boolean,
+  motivo?: string,
+  fechaVigencia?: string // "YYYY-MM-DD"
+) =>
+  http.post<ResumenRecalculo>(`${BASE_PRECIOS}/recalcular`, undefined, {
+    params: clean({ idMonedaOrigen, idMonedaDestino, simular, motivo, fechaVigencia }),
+  }),
+
 
   /* ---------- Historial ---------- */
   historialPorPresentacion: (idPresentacion: number, page = 0, size = 20) =>
@@ -72,10 +79,14 @@ export const preciosService = {
       headers: { "X-Usuario": usuario },
     }),
 
-  /* ---------- Tipos de cambio ---------- */
-  tcVigente: (idOrigen: number, idDestino: number) =>
+    /* ---------- Tipos de cambio ---------- */
+  tcVigente: (idOrigen: number, idDestino: number, fechaVigencia?: string) =>
     http.get<TipoCambioVigente>(`${BASE_TC}/vigente`, {
-      params: { idMonedaOrigen: idOrigen, idMonedaDestino: idDestino },
+      params: clean({
+        idMonedaOrigen: idOrigen,
+        idMonedaDestino: idDestino,
+        fechaVigencia, // opcional
+      }),
     }),
 
   crearTC: (dto: { idMonedaOrigen: number; idMonedaDestino: number; fechaVigencia: string; tasaCambio: number }) =>

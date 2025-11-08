@@ -12,30 +12,27 @@ import java.util.Optional;
 
 public interface TipoDeCambioRepositorio extends JpaRepository<TipoDeCambio, Long> {
 
-    // Última tasa vigente <= fecha
-    Optional<TipoDeCambio>
-    findTopByIdMonedaOrigenAndIdMonedaDestinoAndFechaVigenciaLessThanEqualOrderByFechaVigenciaDesc(
-            Long idMonedaOrigen, Long idMonedaDestino, LocalDate hasta
-    );
+        // Última tasa vigente <= fecha
+        Optional<TipoDeCambio> findTopByIdMonedaOrigenAndIdMonedaDestinoAndFechaVigenciaLessThanEqualOrderByFechaVigenciaDesc(
+                        Long idMonedaOrigen, Long idMonedaDestino, LocalDate hasta);
 
-    // Upsert exacto
-    Optional<TipoDeCambio>
-    findByIdMonedaOrigenAndIdMonedaDestinoAndFechaVigencia(
-            Long idMonedaOrigen, Long idMonedaDestino, LocalDate fechaVigencia
-    );
+        // agrega EXACT MATCH helpers:
+        boolean existsByIdMonedaOrigenAndIdMonedaDestinoAndFechaVigencia(
+                        Long idMonedaOrigen, Long idMonedaDestino, LocalDate fecha);
 
-    // 👉 NUEVOS: para el historial paginado
-    Page<TipoDeCambio>
-    findByIdMonedaOrigenAndIdMonedaDestinoOrderByFechaVigenciaDesc(
-            Long idMonedaOrigen, Long idMonedaDestino, Pageable pageable
-    );
+        // Upsert exacto
+        Optional<TipoDeCambio> findByIdMonedaOrigenAndIdMonedaDestinoAndFechaVigencia(
+                        Long idMonedaOrigen, Long idMonedaDestino, LocalDate fechaVigencia);
 
-    Page<TipoDeCambio>
-    findAllByOrderByFechaVigenciaDesc(Pageable pageable);
+        // 👉 NUEVOS: para el historial paginado
+        Page<TipoDeCambio> findByIdMonedaOrigenAndIdMonedaDestinoOrderByFechaVigenciaDesc(
+                        Long idMonedaOrigen, Long idMonedaDestino, Pageable pageable);
 
-    boolean existsByIdMonedaOrigenOrIdMonedaDestino(Long idMonedaOrigen, Long idMonedaDestino);
+        Page<TipoDeCambio> findAllByOrderByFechaVigenciaDesc(Pageable pageable);
 
-    @Modifying
-    @Query("delete from TipoDeCambio tc where tc.idMonedaOrigen = :id or tc.idMonedaDestino = :id")
-    void deleteAllByMoneda(Long id);
+        boolean existsByIdMonedaOrigenOrIdMonedaDestino(Long idMonedaOrigen, Long idMonedaDestino);
+
+        @Modifying
+        @Query("delete from TipoDeCambio tc where tc.idMonedaOrigen = :id or tc.idMonedaDestino = :id")
+        void deleteAllByMoneda(Long id);
 }
