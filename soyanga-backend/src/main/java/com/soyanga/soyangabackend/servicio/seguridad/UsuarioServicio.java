@@ -211,6 +211,7 @@ public class UsuarioServicio {
         Long actorId = getCurrentUserId();
         boolean actorEsAdmin = usuarioTieneRolAdmin(actorId);
 
+        // Normaliza lista de roles desde rolesIds o (fallback) getRoles()
         List<Long> roles = dto.getRolesIds();
         if (roles == null || roles.isEmpty()) {
             try {
@@ -224,25 +225,34 @@ public class UsuarioServicio {
         if (roles == null) roles = List.of();
         roles = roles.stream().filter(Objects::nonNull).distinct().toList();
 
+        // Obtiene nombres de roles para detectar ADMIN
         final Set<String> nuevosNombres = new HashSet<>();
         for (Long idRol : roles) {
             var rol = rolRepo.findById(idRol)
                     .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado: " + idRol));
             nuevosNombres.add(String.valueOf(rol.getNombreRol()).toUpperCase());
         }
+        boolean intentaAsignarAdmin = nuevosNombres.stream().anyMatch(n -> n.contains("ADMIN"));
+
+        // --- EXCEPCIÓN DE PRIMER ARRANQUE ---
+        // Permitimos asignar ADMIN si la BD está "vacía" (0 o 1 usuario, típico del bootstrap).
+        long totalUsuarios = repo.count();
+        boolean esPrimerArranque = (totalUsuarios <= 1);
 
         if (!actorEsAdmin) {
-            if (nuevosNombres.stream().anyMatch(n -> n.contains("ADMIN"))) {
+            // Si NO es admin, solo se permite ADMIN en primer arranque.
+            if (intentaAsignarAdmin && !esPrimerArranque) {
                 throw new AccessDeniedException("No puedes asignar el rol ADMIN.");
             }
+            // Si el target ya era ADMIN, un no-admin no puede modificar sus roles.
             boolean targetEraAdmin = usuarioTieneRolAdmin(idUsuario);
-            if (targetEraAdmin) {
+            if (targetEraAdmin && !esPrimerArranque) {
                 throw new AccessDeniedException("No puedes modificar roles de un usuario ADMIN.");
             }
         }
 
+        // Reemplaza asignaciones (evitando duplicados)
         userRolRepo.deleteByIdUsuario(idUsuario);
-
         for (Long idRol : roles) {
             if (!userRolRepo.existsByIdUsuarioAndIdRol(idUsuario, idRol)) {
                 userRolRepo.save(UsuarioRol.builder()
@@ -252,7 +262,8 @@ public class UsuarioServicio {
             }
         }
 
-        var u = repo.findById(idUsuario).orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + idUsuario));
+        var u = repo.findById(idUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + idUsuario));
         return toDTOConRoles(u);
     }
 

@@ -13,6 +13,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,10 +46,13 @@ public class BootstrapAdmin implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        // ¿Es el primer arranque? (no hay usuarios)
+        boolean firstBoot = usuarioRepo.count() == 0;
+
         // 1) Rol ADMIN (buscar por nombre exacto; si no existe, crear)
         Long idRolAdmin = findOrCreateAdminRole(adminRoleName);
 
-        // 2) Usuario admin (buscar por username o email directos en el repo, NO usar listar())
+        // 2) Usuario admin (buscar directo en repo)
         var existente = usuarioRepo.findByNombreUsuarioIgnoreCase(adminUsername)
                 .or(() -> usuarioRepo.findByCorreoElectronicoIgnoreCase(adminEmail))
                 .orElse(null);
@@ -75,20 +83,41 @@ public class BootstrapAdmin implements ApplicationRunner {
                 if (r.getIdRol().equals(idRolAdmin)) yaEsAdmin = true;
             }
         }
+
         if (!yaEsAdmin) {
             rolesActuales.add(idRolAdmin);
-            usuarioServicio.asignarRoles(
-                    adminDTO.getIdUsuario(),
-                    UsuarioAsignarRolesDTO.builder().rolesIds(rolesActuales).build()
-            );
-            log.info("[BootstrapAdmin] Asignado rol {} al admin.", adminRoleName);
+
+            Authentication prev = SecurityContextHolder.getContext().getAuthentication();
+            try {
+                if (firstBoot) {
+                    // Impersonación temporal SOLO en primer arranque
+                    var fakeAdmin = new UsernamePasswordAuthenticationToken(
+                            "bootstrap", "N/A",
+                            List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(fakeAdmin);
+                    log.info("[BootstrapAdmin] (primer arranque) Impersonación temporal ROLE_ADMIN para asignar rol al admin.");
+                }
+
+                usuarioServicio.asignarRoles(
+                        adminDTO.getIdUsuario(),
+                        UsuarioAsignarRolesDTO.builder().rolesIds(rolesActuales).build()
+                );
+                log.info("[BootstrapAdmin] Asignado rol {} al admin.", adminRoleName);
+            } finally {
+                // Restaurar contexto de seguridad
+                if (prev != null) {
+                    SecurityContextHolder.getContext().setAuthentication(prev);
+                } else {
+                    SecurityContextHolder.clearContext();
+                }
+            }
         }
 
         log.info("=== Usuario inicial listo: {} / {} ===", adminUsername, adminPassword);
     }
 
     private Long findOrCreateAdminRole(String roleName) {
-        // Busca por nombre exacto a través del servicio (o crea)
         var page = rolServicio.listar(roleName, org.springframework.data.domain.PageRequest.of(0, 50));
         var encontrado = page.getContent().stream()
                 .filter(r -> r != null && roleName.equalsIgnoreCase(r.getNombreRol()))
