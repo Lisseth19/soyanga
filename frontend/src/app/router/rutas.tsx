@@ -70,6 +70,17 @@ function RedirectWithQuery({ to }: { to: string }) {
   return <Navigate to={`${to}${location.search}${location.hash}`} replace />;
 }
 
+//precios
+import ReglasDePrecios from "@/paginas/finanzas/ReglasDePrecios";
+import HistorialPrecios from "@/paginas/finanzas/HistorialPrecios";
+import VentasLayout from "@/app/layout/VentasLayout.tsx";
+import VentasListado from "@/paginas/ventas/VentasListado";
+import VentaNueva from "@/paginas/ventas/VentaNueva";
+import CxcListado from "@/paginas/cobros/CxcListado.tsx";
+import AnticiposListado from "@/paginas/anticipos/AnticiposListado.tsx";
+import AnticipoCrearForm from "@/paginas/anticipos/AnticipoCrearForm.tsx";
+import AnticipoDetalle from "@/paginas/anticipos/AnticipoDetalle.tsx";
+
 export const router = createBrowserRouter([
   // ============================
   // BLOQUE PÚBLICO (NO requiere auth)
@@ -124,6 +135,8 @@ export const router = createBrowserRouter([
           { path: "estructura/almacenes", element: <AlmacenesPage /> },
           { path: "finanzas/monedas", element: <MonedasPage /> },
           { path: "finanzas/tipos-cambio", element: <TiposCambioPage /> },
+          { path: "finanzas/reglas-precios", element: <ReglasDePrecios />},
+          { path: "finanzas/historial-precios", element: <HistorialPrecios /> },
         ],
       },
 
@@ -166,6 +179,26 @@ export const router = createBrowserRouter([
         ],
       },
 
+      // === Ventas (ANIDADO CON LAYOUT) — aquí viven Cobros y Anticipos
+      {
+        path: "/ventas",
+        element: <VentasLayout />,
+        children: [
+          { index: true, element: <VentasListado /> },            // /ventas
+          { path: "nueva", element: <VentaNueva /> },             // /ventas/nueva
+          // { path: ":id", element: <VentaDetalle /> },
+          // { path: ":id/trazabilidad", element: <VentaTrazabilidad /> },
+
+          // Cobros (CxC)
+          { path: "cobros", element: <CxcListado /> },            // /ventas/cobros
+
+          // Anticipos
+          { path: "anticipos", element: <AnticiposListado /> },   // /ventas/anticipos
+          { path: "anticipos/nuevo", element: <AnticipoCrearForm /> }, // /ventas/anticipos/nuevo
+          { path: "anticipos/:id", element: <AnticipoDetalle /> },     // /ventas/anticipos/:id
+        ],
+      },
+
       // === Seguridad ===
       {
         path: "/seguridad",
@@ -198,6 +231,12 @@ export const router = createBrowserRouter([
       { path: "/sucursales", element: <SucursalesList /> },
       { path: "/sucursales/nueva", element: <NuevaSucursal /> },
       { path: "/sucursales/:id", element: <EditarSucursal /> },
+
+      // ===== Aliases de compatibilidad (redirigen al módulo Ventas) =====
+      { path: "/cobros", element: <Navigate to="/ventas/cobros" replace /> },
+      { path: "/anticipos", element: <Navigate to="/ventas/anticipos" replace /> },
+      { path: "/anticipos/nuevo", element: <Navigate to="/ventas/anticipos/nuevo" replace /> },
+      { path: "/anticipos/:id", element: <Navigate to="/ventas/anticipos/:id" replace /> },
 
       // CRM
       { path: "/clientes", element: <ClientesPage /> },

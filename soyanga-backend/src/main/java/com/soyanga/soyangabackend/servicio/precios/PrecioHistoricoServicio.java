@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class PrecioHistoricoServicio {
 
     private final PrecioVentaHistoricoRepositorio precioRepo;
+    private final PoliticaRedondeo redondeo;
 
     public Page<PrecioHistoricoDTO> listar(Long idPresentacion, Pageable pageable) {
         var page = precioRepo.findByIdPresentacionOrderByFechaInicioVigenciaDesc(idPresentacion, pageable);
@@ -23,41 +24,58 @@ public class PrecioHistoricoServicio {
     }
 
     public PrecioHistoricoDTO vigente(Long idPresentacion) {
-        var opt = precioRepo.findFirstByIdPresentacionAndFechaFinVigenciaIsNullOrderByFechaInicioVigenciaDesc(idPresentacion);
+        var opt = precioRepo
+                .findFirstByIdPresentacionAndFechaFinVigenciaIsNullOrderByFechaInicioVigenciaDesc(idPresentacion);
         return opt.map(this::toDTO).orElse(null);
     }
 
     @Transactional
     public PrecioHistoricoDTO crearNuevo(Long idPresentacion, PrecioNuevoDTO dto) {
-        LocalDateTime inicio = dto.getFechaInicioVigencia() != null ? dto.getFechaInicioVigencia() : LocalDateTime.now();
+        // 1) Fecha/hora de aplicación
+        LocalDateTime inicio = dto.getFechaInicioVigencia() != null
+                ? dto.getFechaInicioVigencia()
+                : LocalDateTime.now();
 
-        // Cerrar vigente si existe
-        var vigenteOpt = precioRepo.findFirstByIdPresentacionAndFechaFinVigenciaIsNullOrderByFechaInicioVigenciaDesc(idPresentacion);
-        if (vigenteOpt.isPresent()) {
-            var vigente = vigenteOpt.get();
-            if (inicio.isBefore(vigente.getFechaInicioVigencia())) {
-                throw new IllegalArgumentException("La fecha de inicio del nuevo precio no puede ser anterior al vigente actual");
+        // 2) Redondeo consistente
+        var precioRedondeado = redondeo.aplicar(dto.getPrecioVentaBob());
+
+        // 3) Quitar solapes futuros (si existía algo programado >= inicio)
+        precioRepo.deleteFuturosDesde(idPresentacion, inicio);
+
+        // 4) Recortar el vigente EN la fecha de aplicación, si lo hubiera
+        var vigenteEnInicio = precioRepo.findVigenteEn(idPresentacion, inicio);
+        vigenteEnInicio.ifPresent(v -> {
+            // Si el vigente comienza antes/igual a 'inicio', lo cerramos 1ns antes
+            if (!inicio.isBefore(v.getFechaInicioVigencia())) {
+                v.setFechaFinVigencia(inicio);
+                precioRepo.save(v);
+            } else {
+                // Caso raro: había un registro que "se considera vigente" pero con inicio
+                // posterior.
+                // Ya lo eliminamos en el paso 3 si era futuro; aquí no hay nada más que hacer.
             }
-            // Cerramos el vigente justo antes del nuevo
-            vigente.setFechaFinVigencia(inicio.minusSeconds(1));
-            precioRepo.save(vigente);
-        }
+        });
 
-        // Crear nuevo precio
+        // 5) Crear el nuevo histórico desde 'inicio'
         var nuevo = PrecioVentaHistorico.builder()
                 .idPresentacion(idPresentacion)
-                .precioVentaBob(dto.getPrecioVentaBob())
+                .precioVentaBob(precioRedondeado)
                 .fechaInicioVigencia(inicio)
                 .fechaFinVigencia(null)
                 .motivoCambio(dto.getMotivoCambio())
                 .build();
 
         nuevo = precioRepo.save(nuevo);
+
         return toDTO(nuevo);
     }
 
     // --- Mapeo ---
     private PrecioHistoricoDTO toDTO(PrecioVentaHistorico p) {
+        var ahora = java.time.LocalDateTime.now();
+        boolean vigenteHoy = p.getFechaFinVigencia() == null
+                && !p.getFechaInicioVigencia().isAfter(ahora); // inicio <= ahora
+
         return PrecioHistoricoDTO.builder()
                 .idPrecioHistorico(p.getIdPrecioHistorico())
                 .idPresentacion(p.getIdPresentacion())
@@ -65,7 +83,7 @@ public class PrecioHistoricoServicio {
                 .fechaInicioVigencia(p.getFechaInicioVigencia())
                 .fechaFinVigencia(p.getFechaFinVigencia())
                 .motivoCambio(p.getMotivoCambio())
-                .vigente(p.getFechaFinVigencia() == null)
+                .vigente(vigenteHoy)
                 .build();
     }
 }

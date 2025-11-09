@@ -21,11 +21,9 @@ public class AnticipoAplicacionControlador {
     @ResponseStatus(HttpStatus.CREATED)
     public AplicarAnticipoRespuestaDTO aplicar(
             @PathVariable Long id,
-            @Valid @RequestBody AplicarAnticipoDTO dto
-    ) {
+            @Valid @RequestBody AplicarAnticipoDTO dto) {
         return servicio.aplicar(id, dto);
     }
-
     @GetMapping("/{id}/aplicaciones")
     public org.springframework.data.domain.Page<com.soyanga.soyangabackend.dominio.AplicacionAnticipo> listarAplicaciones(
             @PathVariable("id") Long idAnticipo,

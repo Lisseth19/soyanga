@@ -69,7 +69,6 @@ public class Venta {
     @Column(name = "interes_credito", precision = 5, scale = 2)
     private BigDecimal interesCredito;
 
-
     @Column(name = "fecha_vencimiento_credito")
     private LocalDate fechaVencimientoCredito;
 

@@ -6,15 +6,18 @@ import com.soyanga.soyangabackend.repositorio.cobros.AnticipoRepositorio;
 import com.soyanga.soyangabackend.servicio.cobros.AnticipoAplicacionServicio;
 import com.soyanga.soyangabackend.servicio.cobros.AnticipoConsultaServicio;
 import com.soyanga.soyangabackend.servicio.cobros.ReservaAnticipoServicio;
+import com.soyanga.soyangabackend.servicio.cobros.AnticipoConversionServicio;
+
 import jakarta.validation.Valid;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 @RestController
@@ -26,13 +29,15 @@ public class AnticipoControlador {
     private final AnticipoConsultaServicio consultaServicio;
     private final AnticipoAplicacionServicio aplicacionServicio;
 
+    // NUEVO
+    private final AnticipoConversionServicio conversionServicio;
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> crear(@Valid @RequestBody AnticipoCrearDTO dto) {
         return reservaServicio.crearAnticipo(dto);
     }
 
-    // === LISTAR (idCliente opcional) ===
     @GetMapping
     public Page<AnticipoRepositorio.AnticipoListadoProjection> listar(
             @RequestParam(value = "idCliente", required = false) Long idCliente,
@@ -45,29 +50,34 @@ public class AnticipoControlador {
         return consultaServicio.listar(idCliente, desde, hasta, pageable);
     }
 
-    @PostMapping("/{id}/reservas")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ReservaAnticipoRespuestaDTO reservar(@PathVariable("id") Long idAnticipo,
-                                                @Valid @RequestBody ReservaAnticipoDTO dto) {
-        return reservaServicio.reservar(idAnticipo, dto);
-    }
-
-    @PostMapping("/{id}/reservas/liberar")
-    @ResponseStatus(HttpStatus.OK)
-    public ReservaAnticipoRespuestaDTO liberar(@PathVariable("id") Long idAnticipo,
-                                               @Valid @RequestBody LiberarReservaAnticipoDTO dto) {
-        return reservaServicio.liberar(idAnticipo, dto);
-    }
-
-    @PostMapping("/{id}/reservas/liberar-todo")
-    @ResponseStatus(HttpStatus.OK)
-    public Map<String,Object> liberarTodo(@PathVariable("id") Long idAnticipo) {
-        return reservaServicio.liberarTodo(idAnticipo);
-    }
-
     @GetMapping("/{id}")
     public Anticipo obtener(@PathVariable Long id) {
         return consultaServicio.obtener(id);
     }
 
+    @GetMapping("/{id}/reservas")
+    public ReservaAnticipoRespuestaDTO reservasVigentes(@PathVariable("id") Long idAnticipo) {
+        return reservaServicio.reservasVigentes(idAnticipo);
+    }
+
+    @GetMapping("/{id}/reservas/historico")
+    public ReservaAnticipoRespuestaDTO verReservasHistorico(@PathVariable("id") Long idAnticipo) {
+        return reservaServicio.verReservas(idAnticipo);
+    }
+
+    // ====== CONVERSIÓN: consumir reservas + aplicar anticipo sobre una VENTA existente ======
+    // ÚNICO endpoint soportado: decide "contado"/"crédito" según la venta.
+    @PostMapping("/{id}/convertir-en-venta")
+    @ResponseStatus(HttpStatus.OK)
+    public Map<String,Object> convertirEnVenta(@PathVariable("id") Long idAnticipo,
+                                               @RequestBody ConvertirEnVentaReq body) {
+        return conversionServicio.convertirEnVenta(idAnticipo, body.getIdVenta(), body.getMontoAplicarBob());
+    }
+
+    // ====== DTO del body ======
+    @Data
+    public static class ConvertirEnVentaReq {
+        private Long idVenta;                 // obligatorio
+        private BigDecimal montoAplicarBob;   // opcional (null => aplica todo el saldo disponible, limitado por pendiente)
+    }
 }

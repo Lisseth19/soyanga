@@ -32,18 +32,33 @@ public class PagoAplicacionServicio {
         var detalle = new ArrayList<PagoAplicarRespuestaDTO.Linea>();
         BigDecimal totalAplicado = BigDecimal.ZERO;
 
+        // Puede venir null si el pago se creó sin cliente
+        Long clientePago = pago.getIdCliente();
+
         for (var it : dto.getItems()) {
             var cxc = cxcRepo.findById(it.getIdCuentaCobrar())
                     .orElseThrow(() -> new IllegalArgumentException("CXC no encontrada: " + it.getIdCuentaCobrar()));
 
+            // Cliente dueño de esta CxC (por la venta)
+            var venta = cxcRepo.findVentaInfoByIdCxc(cxc.getIdCuentaCobrar()).orElse(null);
+            Long clienteDeEstaCxc = (venta != null) ? venta.getIdCliente() : null;
+
             // Si el DTO trae idCliente, validar que la CxC pertenezca al mismo cliente
-            if (dto.getIdCliente() != null) {
-                var venta = cxcRepo.findVentaInfoByIdCxc(cxc.getIdCuentaCobrar())
-                        .orElse(null);
-                if (venta != null && venta.getIdCliente() != null &&
-                        !venta.getIdCliente().equals(dto.getIdCliente())) {
-                    throw new IllegalArgumentException("La CxC " + cxc.getIdCuentaCobrar() + " no pertenece al cliente indicado");
-                }
+            if (dto.getIdCliente() != null && clienteDeEstaCxc != null
+                    && !dto.getIdCliente().equals(clienteDeEstaCxc)) {
+                throw new IllegalArgumentException("La CxC " + cxc.getIdCuentaCobrar() + " no pertenece al cliente indicado");
+            }
+
+            // Si el pago aún no tiene cliente, asígnalo desde la primera CxC aplicada
+            if (clientePago == null && clienteDeEstaCxc != null) {
+                pago.setIdCliente(clienteDeEstaCxc);
+                clientePago = clienteDeEstaCxc;
+            }
+
+            // Si ya tiene cliente, validar consistencia
+            if (clientePago != null && clienteDeEstaCxc != null
+                    && !clientePago.equals(clienteDeEstaCxc)) {
+                throw new IllegalArgumentException("El pago pertenece a un cliente distinto al de la CxC.");
             }
 
             if (it.getMontoAplicadoBob().compareTo(cxc.getMontoPendienteBob()) > 0) {
@@ -83,7 +98,7 @@ public class PagoAplicacionServicio {
             totalAplicado = totalAplicado.add(it.getMontoAplicadoBob());
         }
 
-        // (Opcional) podrías marcar algo en el pago, ej. flag de “ya aplicado parcialmente” si quieres.
+        // Asegura fecha y guarda cambios del pago (incluye idCliente si se asignó arriba)
         pago.setFechaPago(pago.getFechaPago() != null ? pago.getFechaPago() : LocalDateTime.now());
         pagoRepo.save(pago);
 
