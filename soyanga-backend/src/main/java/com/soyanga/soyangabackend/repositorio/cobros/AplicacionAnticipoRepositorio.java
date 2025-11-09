@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AplicacionAnticipoRepositorio extends JpaRepository<AplicacionAnticipo, Long> {
+
     /* =========================
        AGREGADOS (JPQL)
        ========================= */
@@ -95,7 +96,6 @@ public interface AplicacionAnticipoRepositorio extends JpaRepository<AplicacionA
             FROM aplicaciones_de_anticipo a
             WHERE a.id_anticipo = :idAnticipo
             ORDER BY a.fecha_aplicacion DESC, a.id_aplicacion_anticipo DESC
-
             """,
             countQuery = """
             SELECT COUNT(*)
@@ -104,5 +104,4 @@ public interface AplicacionAnticipoRepositorio extends JpaRepository<AplicacionA
             """,
             nativeQuery = true)
     Page<AplicacionAnticipo> listarPorAnticipoEntidad(@Param("idAnticipo") Long idAnticipo, Pageable pageable);
-
 }
