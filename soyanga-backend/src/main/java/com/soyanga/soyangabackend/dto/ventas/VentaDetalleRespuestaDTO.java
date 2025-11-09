@@ -25,11 +25,15 @@ public class VentaDetalleRespuestaDTO {
 
     private String metodoDePago;
     private String condicionDePago;
-  //  private BigDecimal interesCredito;
+    //  private BigDecimal interesCredito;
     private LocalDate fechaVencimientoCredito;
 
     private Long idAlmacenDespacho;
     private String observaciones;
+    private BigDecimal interesCreditoPct;    // %
+    private BigDecimal interesCreditoMonto;  // totalNeto * pct/100
+    private BigDecimal totalCobrarBob;       // totalNeto + interes
+
 
     // CxC (si aplica)
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder

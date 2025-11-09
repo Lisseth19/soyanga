@@ -41,11 +41,11 @@ public class PagoServicio {
 
         var pago = PagoRecibido.builder()
                 .fechaPago(fecha)
-                .idCliente(dto.getIdCliente())
+                .idCliente(dto.getIdCliente()) // puede venir null
                 .idMoneda(dto.getIdMoneda())
                 .montoMoneda(dto.getMontoMoneda())
                 .montoBobEquivalente(eqBob)
-                .metodoDePago(metodoEnum)                  // <-- enum aquí
+                .metodoDePago(metodoEnum)
                 .referenciaExterna(dto.getReferenciaExterna())
                 .aplicaACuenta(dto.getAplicaACuenta() != null ? dto.getAplicaACuenta() : Boolean.TRUE)
                 .build();
@@ -67,9 +67,28 @@ public class PagoServicio {
                 throw new IllegalArgumentException("La suma de aplicaciones excede el monto del pago en BOB");
             }
 
+            // Detectar/validar cliente del pago en función de las CxC aplicadas
+            Long clienteDetectado = pago.getIdCliente();
+
             for (var a : dto.getAplicaciones()) {
                 var cxc = cxcRepo.findById(a.getIdCuentaCobrar())
                         .orElseThrow(() -> new IllegalArgumentException("CXC no encontrada: " + a.getIdCuentaCobrar()));
+
+                // Cliente dueño de esta CxC (por la venta)
+                var ventaInfo = cxcRepo.findVentaInfoByIdCxc(cxc.getIdCuentaCobrar()).orElse(null);
+                Long clienteDeEstaCxc = (ventaInfo != null) ? ventaInfo.getIdCliente() : null;
+
+                // Si el pago aún no tiene cliente, asignar el primero detectado
+                if (clienteDetectado == null && clienteDeEstaCxc != null) {
+                    pago.setIdCliente(clienteDeEstaCxc);
+                    clienteDetectado = clienteDeEstaCxc;
+                }
+
+                // Si ya hay cliente (del DTO o asignado), validar consistencia
+                if (clienteDetectado != null && clienteDeEstaCxc != null
+                        && !clienteDetectado.equals(clienteDeEstaCxc)) {
+                    throw new IllegalArgumentException("Las CxC aplicadas pertenecen a diferentes clientes.");
+                }
 
                 // aplicar
                 BigDecimal nuevoPendiente = cxc.getMontoPendienteBob().subtract(a.getMontoAplicadoBob());
@@ -79,9 +98,9 @@ public class PagoServicio {
 
                 cxc.setMontoPendienteBob(nuevoPendiente);
                 if (nuevoPendiente.compareTo(BigDecimal.ZERO) == 0) {
-                    cxc.setEstadoCuenta(EstadoCuenta.pagado);  // antes: "pagado"
+                    cxc.setEstadoCuenta(EstadoCuenta.pagado);
                 } else {
-                    cxc.setEstadoCuenta(EstadoCuenta.parcial); // antes: "parcial"
+                    cxc.setEstadoCuenta(EstadoCuenta.parcial);
                 }
                 cxcRepo.save(cxc);
 
@@ -95,6 +114,9 @@ public class PagoServicio {
                 cxcAfectadas.add(cxc.getIdCuentaCobrar());
                 aplicado = true;
             }
+
+            // Guardar el pago por si se asignó idCliente durante el loop
+            pagoRepo.save(pago);
         }
 
         return PagoRespuestaDTO.builder()
@@ -104,6 +126,7 @@ public class PagoServicio {
                 .cxcAfectadas(cxcAfectadas)
                 .build();
     }
+
     private PagoRecibido.MetodoDePago parseMetodo(String raw) {
         if (raw == null || raw.isBlank()) {
             throw new IllegalArgumentException("metodoDePago es requerido (efectivo/transferencia)");

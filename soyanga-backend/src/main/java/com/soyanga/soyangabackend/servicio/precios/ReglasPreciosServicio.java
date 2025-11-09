@@ -8,12 +8,10 @@ import com.soyanga.soyangabackend.repositorio.catalogo.PresentacionProductoRepos
 import com.soyanga.soyangabackend.repositorio.catalogo.TipoDeCambioRepositorio;
 import com.soyanga.soyangabackend.repositorio.precios.PrecioVentaHistoricoRepositorio;
 import com.soyanga.soyangabackend.seguridad.AuthUtils;
-
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -126,6 +124,7 @@ public class ReglasPreciosServicio {
                 var inicioEf = (inicio != null) ? inicio : LocalDateTime.now();
                 // antes de lockVigenteHastaAhora(...)
                 historicoRepo.deleteFuturosDesde(idPresentacion, inicioEf);
+
 
                 // Cerrar vigente hasta ahora (sin tocar futuros)
                 historicoRepo.lockVigenteHastaAhora(idPresentacion, inicioEf)

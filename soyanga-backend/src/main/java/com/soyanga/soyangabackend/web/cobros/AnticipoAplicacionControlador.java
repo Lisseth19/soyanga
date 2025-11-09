@@ -24,7 +24,6 @@ public class AnticipoAplicacionControlador {
             @Valid @RequestBody AplicarAnticipoDTO dto) {
         return servicio.aplicar(id, dto);
     }
-
     @GetMapping("/{id}/aplicaciones")
     public org.springframework.data.domain.Page<com.soyanga.soyangabackend.dominio.AplicacionAnticipo> listarAplicaciones(
             @PathVariable("id") Long idAnticipo,

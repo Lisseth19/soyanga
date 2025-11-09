@@ -65,6 +65,17 @@ import RolesPage from "@/paginas/seguridad/Roles";
 import PermisosPage from "@/paginas/seguridad/Permisos";
 import AuditoriasPage from "@/paginas/seguridad/Auditorias";
 
+// precios
+import ReglasDePrecios from "@/paginas/finanzas/ReglasDePrecios";
+import HistorialPrecios from "@/paginas/finanzas/HistorialPrecios";
+import VentasLayout from "@/app/layout/VentasLayout.tsx";
+import VentasListado from "@/paginas/ventas/VentasListado";
+import VentaNueva from "@/paginas/ventas/VentaNueva";
+import CxcListado from "@/paginas/cobros/CxcListado.tsx";
+import AnticiposListado from "@/paginas/anticipos/AnticiposListado.tsx";
+import AnticipoCrearForm from "@/paginas/anticipos/AnticipoCrearForm.tsx";
+import AnticipoDetalle from "@/paginas/anticipos/AnticipoDetalle.tsx";
+
 function RedirectWithQuery({ to }: { to: string }) {
   const location = useLocation();
   return <Navigate to={`${to}${location.search}${location.hash}`} replace />;
@@ -75,6 +86,9 @@ import ReglasDePrecios from "@/paginas/finanzas/ReglasDePrecios";
 import HistorialPrecios from "@/paginas/finanzas/HistorialPrecios";
 
 export const router = createBrowserRouter([
+  // NUEVO: raíz del sitio redirige al inicio público
+  { path: "/", element: <Navigate to="/soyanga/inicio" replace /> },
+
   // ============================
   // BLOQUE PÚBLICO (NO requiere auth)
   // ============================
@@ -93,9 +107,12 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Login
-  { path: "/soyanga/login", element: <LoginPage /> },
-  { path: "/login", element: <Navigate to="/soyanga/login" replace /> },
+  // LOGIN “OCULTO” PARA PERSONAL
+  { path: "/admin", element: <Navigate to="/admin/login" replace /> },
+  { path: "/admin/login", element: <LoginPage /> },
+
+  // (Opcional) si alguien prueba /login lo mandamos al público
+  { path: "/login", element: <Navigate to="/soyanga/inicio" replace /> },
 
   // ============================
   // BLOQUE AUTH MINIMAL (ej. reset password)
@@ -111,9 +128,9 @@ export const router = createBrowserRouter([
   // ============================
   {
     element: (
-      <RequireAuth>
-        <AppLayout />
-      </RequireAuth>
+        <RequireAuth>
+          <AppLayout />
+        </RequireAuth>
     ),
     children: [
       { path: "/inicio", element: <Inicio /> },
@@ -129,6 +146,7 @@ export const router = createBrowserRouter([
           { path: "finanzas/monedas", element: <MonedasPage /> },
          // { path: "finanzas/tipos-cambio", element: <TiposCambioPage /> },
           { path: "finanzas/reglas-precios", element: <ReglasDePrecios />},
+
           { path: "finanzas/historial-precios", element: <HistorialPrecios /> },
         ],
       },
@@ -157,18 +175,32 @@ export const router = createBrowserRouter([
         path: "/compras",
         element: <ComprasLayout />,
         children: [
-          { index: true, element: <ComprasListaPage /> }, // Landing del módulo
-          // Proveedores
+          { index: true, element: <ComprasListaPage /> },
           { path: "proveedores", element: <ProveedoresPage /> },
-          // Pedidos
           { path: "pedidos", element: <ComprasListaPage /> },
           { path: "pedidos/nuevo", element: <CompraNuevaPage /> },
           { path: "pedidos/:id", element: <CompraDetallePage /> },
-          // Recepciones para un pedido
           { path: "pedidos/:id/recepciones/nueva", element: <RecepcionNuevaPage /> },
-          // Alias históricos
           { path: ":id", element: <CompraDetallePage /> },
           { path: ":id/recepciones/nueva", element: <RecepcionNuevaPage /> },
+        ],
+      },
+
+      // === Ventas — Cobros y Anticipos
+      {
+        path: "/ventas",
+        element: <VentasLayout />,
+        children: [
+          { index: true, element: <VentasListado /> },
+          { path: "nueva", element: <VentaNueva /> },
+
+          // Cobros (CxC)
+          { path: "cobros", element: <CxcListado /> },
+
+          // Anticipos
+          { path: "anticipos", element: <AnticiposListado /> },
+          { path: "anticipos/nuevo", element: <AnticipoCrearForm /> },
+          { path: "anticipos/:id", element: <AnticipoDetalle /> },
         ],
       },
 
@@ -177,7 +209,7 @@ export const router = createBrowserRouter([
         path: "/seguridad",
         element: <SeguridadLayout />,
         children: [
-          { index: true, element: <UsuariosPage /> }, // el layout puede redirigir según permisos
+          { index: true, element: <UsuariosPage /> },
           { path: "usuarios", element: <UsuariosPage /> },
           { path: "roles", element: <RolesPage /> },
           { path: "permisos", element: <PermisosPage /> },
@@ -185,7 +217,7 @@ export const router = createBrowserRouter([
         ],
       },
 
-      // === Inventario (módulo nuevo con subrutas) ===
+      // === Inventario ===
       {
         path: "/inventario",
         element: <InventarioLayout />,
@@ -197,22 +229,27 @@ export const router = createBrowserRouter([
         ],
       },
 
-      // Inventario por lote (ruta directa que ya usas en el layout)
       { path: "/inventario/por-lote", element: <InventarioPorLotePage /> },
 
-      // Sucursales (atajos fuera de /config si los usas en la UI)
+      // Sucursales
       { path: "/sucursales", element: <SucursalesList /> },
       { path: "/sucursales/nueva", element: <NuevaSucursal /> },
       { path: "/sucursales/:id", element: <EditarSucursal /> },
 
+      // Aliases hacia Ventas
+      { path: "/cobros", element: <Navigate to="/ventas/cobros" replace /> },
+      { path: "/anticipos", element: <Navigate to="/ventas/anticipos" replace /> },
+      { path: "/anticipos/nuevo", element: <Navigate to="/ventas/anticipos/nuevo" replace /> },
+      { path: "/anticipos/:id", element: <Navigate to="/ventas/anticipos/:id" replace /> },
+
       // CRM
       { path: "/clientes", element: <ClientesPage /> },
 
-      // === Catch-all PRIVADO: manda al /inicio (no al público) ===
+      // Catch-all PRIVADO: manda al /inicio (no al público)
       { path: "*", element: <Navigate to="/inicio" replace /> },
     ],
   },
 
-  // Catch-all GLOBAL → homepage pública (asegura que / caiga en público)
+  // Catch-all GLOBAL → homepage pública (si algo quedó suelto)
   { path: "*", element: <Navigate to="/soyanga/inicio" replace /> },
 ]);

@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import { preciosService } from "@/servicios/precios";
 import AjusteManualModal from "@/componentes/precios/AjusteManualModal";
@@ -10,10 +11,8 @@ export default function HistorialPrecios() {
   const [hasta, setHasta] = useState<string | undefined>();
   const [motivo, setMotivo] = useState("");
   const [usuario, setUsuario] = useState("");
-
   const [page, setPage] = useState(0);
   const [size] = useState(20);
-
   const emptyPage: Page<PrecioHistoricoDTO> = {
     content: [],
     totalPages: 0,
@@ -29,7 +28,6 @@ export default function HistorialPrecios() {
     open: false,
     id: null,
   });
-
   // refs para abrir el datepicker nativo
   const refDesde = useRef<HTMLInputElement>(null);
   const refHasta = useRef<HTMLInputElement>(null);
@@ -64,6 +62,7 @@ export default function HistorialPrecios() {
         e?.message ||
         "Error desconocido";
       alert(msg);
+
     }
   };
 

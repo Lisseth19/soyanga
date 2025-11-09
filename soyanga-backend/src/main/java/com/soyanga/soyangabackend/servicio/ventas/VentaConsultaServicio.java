@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -33,13 +35,12 @@ public class VentaConsultaServicio {
         var header = ventaRepo.header(idVenta);
         if (header == null) throw new IllegalArgumentException("Venta no encontrada: " + idVenta);
 
-        // Items
+        // ===== Items
         var items = vdRepo.itemsDeVenta(idVenta);
         var ids = items.stream().map(VentaDetalleRepositorio.VentaItemProjection::getIdVentaDetalle).toList();
 
         Map<Long, List<VentaDetalleRespuestaDTO.Lote>> lotesPorItem = new HashMap<>();
         if (!ids.isEmpty()) {
-            // Asegúrate de tener este método en tu repo (abajo te dejo el SQL sugerido)
             var lotes = vdlRepo.lotesDeItems(ids);
             for (var l : lotes) {
                 lotesPorItem
@@ -66,7 +67,20 @@ public class VentaConsultaServicio {
                 .build()
         ).toList();
 
-        // CxC (si aplica)
+        // ===== Interés (mostrar siempre para crédito; persiste aunque haya pagos)
+        BigDecimal interesPct = header.getInteresCredito() != null ? header.getInteresCredito() : BigDecimal.ZERO;
+        BigDecimal totalNeto = header.getTotalNetoBob() != null ? header.getTotalNetoBob() : BigDecimal.ZERO;
+        BigDecimal interesMonto = BigDecimal.ZERO;
+        BigDecimal totalCobrar = totalNeto;
+
+        if (interesPct.signum() > 0) {
+            interesMonto = totalNeto.multiply(interesPct)
+                    .divide(new BigDecimal("100"), 6, RoundingMode.HALF_UP)
+                    .setScale(2, RoundingMode.HALF_UP);
+            totalCobrar = totalNeto.add(interesMonto).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // ===== CxC (si aplica)
         VentaDetalleRespuestaDTO.CxcInfo cxcInfo = null;
         var cxcOpt = cxcRepo.findByIdVenta(idVenta);
         if (cxcOpt.isPresent()) {
@@ -85,6 +99,7 @@ public class VentaConsultaServicio {
                     .build();
         }
 
+        // ===== Respuesta
         return VentaDetalleRespuestaDTO.builder()
                 .idVenta(header.getIdVenta())
                 .fechaVenta(header.getFechaVenta())
@@ -96,12 +111,15 @@ public class VentaConsultaServicio {
                 .idMoneda(header.getIdMoneda())
                 .totalBrutoBob(header.getTotalBrutoBob())
                 .descuentoTotalBob(header.getDescuentoTotalBob())
-                .totalNetoBob(header.getTotalNetoBob())
+                .totalNetoBob(totalNeto)
                 .metodoDePago(header.getMetodoDePago())
                 .condicionDePago(header.getCondicionDePago())
                 .fechaVencimientoCredito(header.getFechaVencimientoCredito())
                 .idAlmacenDespacho(header.getIdAlmacenDespacho())
                 .observaciones(header.getObservaciones())
+                .interesCreditoPct(interesPct)
+                .interesCreditoMonto(interesMonto)
+                .totalCobrarBob(totalCobrar)
                 .cxc(cxcInfo)
                 .items(itemsDTO)
                 .build();

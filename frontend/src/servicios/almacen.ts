@@ -8,9 +8,28 @@ export interface OpcionIdNombre {
   nombre: string;
 }
 
+/** DTO de presentaciones visibles en un almacén (alineado al backend) */
+export interface PresentacionEnAlmacenDTO {
+  idPresentacion: number;
+  sku?: string | null;
+  producto: string;
+  /** Texto libre de la presentación, p.ej. "1 L" (si el backend lo arma) */
+  presentacion?: string | null;
+  unidad?: string | null;
+  stockDisponible: number;
+  reservado?: number | null;
+  precioBob?: number | null;
+  /** campos de lote son opcionales; el backend puede no enviarlos */
+  loteNumero?: string | null;
+  loteVencimiento?: string | null; // ISO (YYYY-MM-DD)
+  loteDisponible?: number | null;
+  /** url de imagen de la presentación (si existe en DB) */
+  imagenUrl?: string | null;
+}
+
 const BASE = "/v1/catalogo/almacenes";
 
-/** Forma que devuelve la API en list/get */
+/** Forma que devuelve la API en list/get (cuando no es exactamente Almacen) */
 type AlmacenAPI = {
   idAlmacen: number;
   idSucursal: number;
@@ -28,11 +47,24 @@ const fromApi = (a: AlmacenAPI): Almacen => ({
   estadoActivo: a.estadoActivo,
 });
 
-function clean<T extends Record<string, unknown>>(obj: T): T {
-  const out: Record<string, unknown> = { ...obj };
-  Object.keys(out).forEach((k) => {
-    const v = out[k];
-    if (v === undefined || v === null || v === "") delete out[k];
+/** type guard para decidir si mapear con fromApi */
+function isAlmacenAPI(x: any): x is AlmacenAPI {
+  return (
+      x &&
+      typeof x === "object" &&
+      "idAlmacen" in x &&
+      "nombreAlmacen" in x &&
+      "estadoActivo" in x
+  );
+}
+
+/** Limpia objetos quitando undefined/null/""; admite input opcional */
+function clean<T extends Record<string, unknown>>(obj?: T): T | undefined {
+  if (!obj) return obj;
+  const out: Record<string, unknown> = {};
+  Object.entries(obj).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    out[k] = v;
   });
   return out as T;
 }
@@ -56,13 +88,15 @@ function normalizeListParams(params: {
   const p: Record<string, unknown> = { ...params };
 
   // mapear "activos" legacy
-  if (typeof params.activos === "boolean" && params.soloActivos === undefined && params.incluirInactivos === undefined) {
-    // activos === true => solo activos
+  if (
+      typeof params.activos === "boolean" &&
+      params.soloActivos === undefined &&
+      params.incluirInactivos === undefined
+  ) {
     if (params.activos) {
-      p.soloActivos = true;
+      p.soloActivos = true; // activos === true => solo activos
     }
-    // activos === false (solo inactivos) no está soportado por este endpoint; dejamos sin mandar nada especial.
-    delete p.activos;
+    delete (p as any).activos;
   }
 
   // si ambos llegan, respetamos incluirInactivos (explícito) y quitamos soloActivos
@@ -74,7 +108,7 @@ function normalizeListParams(params: {
 }
 
 export const almacenService = {
-  // LISTAR
+  /** Listado paginado de almacenes (mapea si viene en forma AlmacenAPI) */
   async list(params: {
     q?: string;
     idSucursal?: number;
@@ -86,36 +120,61 @@ export const almacenService = {
     sort?: string;
   }): Promise<Page<Almacen>> {
     const qp = normalizeListParams(params);
-    const res = await http.get<Page<AlmacenAPI>>(BASE, { params: qp });
-    return { ...res, content: (res.content ?? []).map(fromApi) } as Page<Almacen>;
+    const res = await http.get<Page<AlmacenAPI | Almacen>>(BASE, { params: qp });
+    const content = (res.content ?? []).map((item) =>
+        isAlmacenAPI(item) ? fromApi(item) : (item as Almacen)
+    );
+    return { ...res, content } as Page<Almacen>;
   },
 
-  // OBTENER
-  get: (id: number) => http.get<AlmacenAPI>(`${BASE}/${id}`).then(fromApi),
+  /** Obtener un almacén por id (alias: get / obtener) */
+  async obtener(id: number): Promise<Almacen> {
+    const data = await http.get<AlmacenAPI | Almacen>(`${BASE}/${id}`);
+    return isAlmacenAPI(data) ? fromApi(data) : (data as Almacen);
+  },
+  get(id: number) {
+    return this.obtener(id);
+  },
 
-  // CREAR
-  create: (dto: AlmacenCrear) =>
-      http.post<AlmacenAPI, AlmacenCrear>(BASE, dto).then(fromApi),
+  /** Crear */
+  async create(dto: AlmacenCrear): Promise<Almacen> {
+    const data = await http.post<AlmacenAPI | Almacen, AlmacenCrear>(BASE, dto);
+    return isAlmacenAPI(data) ? fromApi(data) : (data as Almacen);
+  },
 
-  // ACTUALIZAR
-  update: (id: number, dto: AlmacenActualizar) =>
-      http.put<AlmacenAPI, AlmacenActualizar>(`${BASE}/${id}`, dto).then(fromApi),
+  /** Actualizar */
+  async update(id: number, dto: AlmacenActualizar): Promise<Almacen> {
+    const data = await http.put<AlmacenAPI | Almacen, AlmacenActualizar>(
+        `${BASE}/${id}`,
+        dto
+    );
+    return isAlmacenAPI(data) ? fromApi(data) : (data as Almacen);
+  },
 
-  // CAMBIAR ESTADO (PATCH body { activo })
-  toggleActivo: (id: number, activo: boolean) =>
-      http.patch<void, { activo: boolean }>(`${BASE}/${id}/estado`, { activo }),
+  /** Cambiar estado (PATCH body { activo }) */
+  async toggleActivo(id: number, activo: boolean): Promise<void> {
+    await http.patch<void, { activo: boolean }>(`${BASE}/${id}/estado`, { activo });
+  },
 
-  // ELIMINAR
-  remove: (id: number) => http.del<void>(`${BASE}/${id}`),
+  /** Eliminar */
+  async remove(id: number): Promise<void> {
+    await http.del<void>(`${BASE}/${id}`);
+  },
 
   /**
    * OPCIONES para combos (id + nombre)
    * - nombre oficial: `opciones(...)`
    * - alias de compatibilidad: `options(...)`
+   * - Soporta filtrado por `q` en cliente si el endpoint no lo soporta
    */
-  opciones: async (params?: { incluirInactivos?: boolean; soloActivos?: boolean; idSucursal?: number; q?: string }) => {
+  async opciones(params?: {
+    incluirInactivos?: boolean;
+    soloActivos?: boolean;
+    idSucursal?: number;
+    q?: string;
+  }): Promise<OpcionIdNombre[]> {
     try {
-      // Llama al endpoint oficial del backend
+      // Intento 1: endpoint dedicado de opciones
       const baseOpts = await http.get<OpcionIdNombre[]>(`${BASE}/opciones`, {
         params: clean({
           incluirInactivos: params?.incluirInactivos,
@@ -124,17 +183,16 @@ export const almacenService = {
         }),
       });
 
-      // Si viene `q`, filtramos en cliente (el endpoint no soporta q)
       if (params?.q) {
         const q = params.q.toLowerCase().trim();
         return baseOpts.filter((o) => o.nombre.toLowerCase().includes(q));
       }
       return baseOpts;
-    } catch (e: any) {
-      // Fallback si /opciones no existiera (o por compatibilidad)
-      const page = await http.get<Page<AlmacenAPI>>(BASE, {
+    } catch {
+      // Fallback: usa listado y mapea a opciones
+      const page = await http.get<Page<AlmacenAPI | Almacen>>(BASE, {
         params: clean({
-          q: params?.q,
+          q: params?.q, // si el backend lo ignora no afecta
           incluirInactivos: params?.incluirInactivos,
           soloActivos: params?.soloActivos,
           idSucursal: params?.idSucursal,
@@ -143,11 +201,40 @@ export const almacenService = {
           sort: "nombreAlmacen,asc",
         }),
       });
-      return (page.content ?? []).map((a) => ({ id: a.idAlmacen, nombre: a.nombreAlmacen } as OpcionIdNombre));
+      const list = (page.content ?? []).map((a) =>
+          isAlmacenAPI(a) ? fromApi(a) : (a as Almacen)
+      );
+      return list.map((a) => ({ id: a.idAlmacen, nombre: a.nombreAlmacen }));
     }
   },
 
-  // alias en-US para pantallas antiguas
-  options: (params?: { incluirInactivos?: boolean; soloActivos?: boolean; idSucursal?: number; q?: string }) =>
-      almacenService.opciones(params),
+  // alias en-US / compatibilidad
+  options(params?: {
+    incluirInactivos?: boolean;
+    soloActivos?: boolean;
+    idSucursal?: number;
+    q?: string;
+  }) {
+    return this.opciones(params);
+  },
+
+  /** Presentaciones/productos de un almacén (paginado) */
+  async listarPresentaciones(
+      idAlmacen: number,
+      params?: {
+        q?: string;
+        categoriaId?: number;
+        soloConStock?: boolean;
+        page?: number;
+        size?: number;
+        /** el backend puede ignorar sort si es native query; no pasa nada */
+        sort?: string; // ej. "producto,asc"
+        include?: string; // ej. "lotes" (si luego se soporta)
+      }
+  ): Promise<Page<PresentacionEnAlmacenDTO>> {
+    return http.get<Page<PresentacionEnAlmacenDTO>>(
+        `${BASE}/${idAlmacen}/presentaciones`,
+        { params: clean(params) }
+    );
+  },
 };

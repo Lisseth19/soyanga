@@ -43,9 +43,11 @@ public class HistoricoConsultaServicio {
     }
 
     private PrecioHistoricoDTO toDTO(PrecioVentaHistorico h) {
+
         var ahora = java.time.LocalDateTime.now();
         boolean vigenteHoy = h.getFechaFinVigencia() == null
                 && !h.getFechaInicioVigencia().isAfter(ahora); // inicio <= ahora
+
 
         return PrecioHistoricoDTO.builder()
                 .idPrecioHistorico(h.getIdPrecioHistorico())
@@ -55,6 +57,7 @@ public class HistoricoConsultaServicio {
                 .fechaFinVigencia(h.getFechaFinVigencia())
                 .motivoCambio(h.getMotivoCambio())
                 .vigente(vigenteHoy)
+
                 .build();
     }
 }

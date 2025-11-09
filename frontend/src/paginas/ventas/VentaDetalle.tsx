@@ -1,8 +1,10 @@
 // src/paginas/ventas/VentaDetalle.tsx
 import { useEffect, useMemo, useState } from "react";
 import { ventasService } from "@/servicios/ventas";
-import type { VentaDetalleRespuestaDTO } from "@/types/ventas";
+import type { VentaDetalleRespuestaDTO, VentaTrazabilidadDTO } from "@/types/ventas";
 import VentaTrazabilidad from "@/paginas/ventas/VentaTrazabilidad";
+import CxcPanelDetalle from "@/componentes/cxc/CxcPanelDetalle";
+import { almacenService, type OpcionIdNombre } from "@/servicios/almacen";
 
 function fmtFecha(iso?: string | null) {
     if (!iso) return "-";
@@ -30,8 +32,20 @@ export default function VentaDetalle({
     const [data, setData] = useState<VentaDetalleRespuestaDTO | null>(null);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState<string | null>(null);
-
     const [openTraz, setOpenTraz] = useState(false);
+
+    // Para mostrar el nombre del almacén
+    const [almacenes, setAlmacenes] = useState<OpcionIdNombre[]>([]);
+
+    // Para derivar interés si el DTO no trae el porcentaje
+    const [cxcPendiente, setCxcPendiente] = useState<number | null>(null);
+
+    useEffect(() => {
+        almacenService
+            .options()
+            .then(setAlmacenes)
+            .catch(() => setAlmacenes([]));
+    }, []);
 
     useEffect(() => {
         (async () => {
@@ -47,6 +61,34 @@ export default function VentaDetalle({
             }
         })();
     }, [idVenta]);
+
+    // Si el DTO de detalle no trae CxC, intento obtenerlo desde trazabilidad
+    useEffect(() => {
+        // Si ya vino en el detalle, úsalo
+        const posible = Number((data as any)?.cxc?.montoPendienteBob ?? 0);
+        if (posible > 0) {
+            setCxcPendiente(posible);
+            return;
+        }
+        // Si es una venta al crédito, intenta obtener el pendiente desde trazabilidad
+        const esCredito =
+            String(data?.condicionDePago ?? "").toLowerCase() === "credito";
+        if (!esCredito) {
+            setCxcPendiente(null);
+            return;
+        }
+        ventasService
+            .trazabilidad(idVenta)
+            .then((t: VentaTrazabilidadDTO) => {
+                // Intento varias formas comunes de llegar al monto pendiente/total a cobrar
+                const m1 = Number((t as any)?.cxc?.montoPendienteBob ?? 0);
+                const m2 = Number((t as any)?.cuentaPorCobrar?.montoPendienteBob ?? 0);
+                const m3 = Number((t as any)?.cxc?.totalACobrarBob ?? 0);
+                const best = Math.max(m1, m2, m3);
+                setCxcPendiente(best > 0 ? best : null);
+            })
+            .catch(() => setCxcPendiente(null));
+    }, [idVenta, data]);
 
     // ===== Totales (panel derecho) =====
     const totales = useMemo(() => {
@@ -68,23 +110,36 @@ export default function VentaDetalle({
         const impuestoPct =
             baseImponible > 0 ? (impuestoMonto / baseImponible) * 100 : 0;
 
-        // Interés derivado (desde CxC; si no hay diferencia, intenta con interesCredito%)
+        // Interés
         const esCredito =
             String(data?.condicionDePago ?? "").toLowerCase() === "credito";
+
+        // 1) Intenta porcentaje directo del DTO (varía de nombre según backend)
+        let interesPctRaw =
+            Number((data as any)?.interesCredito ?? 0) ||
+            Number((data as any)?.interesCreditoPct ?? 0) ||
+            Number((data as any)?.interes ?? 0);
+
+        // 2) Monto por diferencia con CxC (si el porcentaje no vino)
         let interesMonto = 0;
         if (esCredito) {
-            const pendienteCxC = Number(data?.cxc?.montoPendienteBob ?? 0);
-            interesMonto = Math.max(0, pendienteCxC - netoInclImpuesto);
-
-            if (interesMonto === 0) {
-                const interesCreditoPct = Number((data as any)?.interesCredito ?? 0);
-                if (interesCreditoPct > 0) {
-                    interesMonto = netoInclImpuesto * (interesCreditoPct / 100);
+            if (interesPctRaw > 0) {
+                interesMonto = netoInclImpuesto * (interesPctRaw / 100);
+            } else {
+                // Si no hay % en DTO, derivar por diferencia con CxC (si lo tenemos)
+                const cxcTotal =
+                    Number((data as any)?.cxc?.montoPendienteBob ?? 0) ||
+                    Number(cxcPendiente ?? 0);
+                if (cxcTotal > netoInclImpuesto) {
+                    interesMonto = cxcTotal - netoInclImpuesto;
+                    // Derivar % para mostrarlo lindo
+                    if (netoInclImpuesto > 0) {
+                        interesPctRaw = (interesMonto / netoInclImpuesto) * 100;
+                    }
                 }
             }
         }
-        const interesPct =
-            netoInclImpuesto > 0 ? (interesMonto / netoInclImpuesto) * 100 : 0;
+        const interesPct = interesPctRaw || 0;
 
         // Total final mostrado (neto + interés)
         const netoConTodo = netoInclImpuesto + interesMonto;
@@ -99,9 +154,19 @@ export default function VentaDetalle({
             netoConTodo,
             netoSinInteres: netoInclImpuesto,
         };
-    }, [data]);
+    }, [data, cxcPendiente]);
 
     const totalItems = useMemo(() => data?.items?.length ?? 0, [data]);
+
+    // Nombre del almacén
+    const nombreAlmacen = useMemo(() => {
+        const byId = almacenes.find((a) => a.id === (data?.idAlmacenDespacho as any));
+        return (
+            (data as any)?.almacenDespachoNombre ??
+            byId?.nombre ??
+            (data?.idAlmacenDespacho != null ? String(data.idAlmacenDespacho) : "-")
+        );
+    }, [almacenes, data]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -139,7 +204,7 @@ export default function VentaDetalle({
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* ===== Columna izquierda (Info + Ítems) ===== */}
                             <div className="lg:col-span-2 space-y-6">
-                                {/* Información general — estilo “definición”, limpio */}
+                                {/* Información general */}
                                 <div className="rounded-xl border p-4">
                                     <h4 className="font-semibold mb-3">Información general</h4>
 
@@ -185,7 +250,7 @@ export default function VentaDetalle({
                                         )}
                                         <div>
                                             <dt className="text-neutral-500">Almacén despacho</dt>
-                                            <dd className="font-medium">{data.idAlmacenDespacho}</dd>
+                                            <dd className="font-medium">{nombreAlmacen}</dd>
                                         </div>
 
                                         {data.observaciones && (
@@ -296,37 +361,7 @@ export default function VentaDetalle({
                                 </div>
 
                                 {/* CxC */}
-                                {data.cxc && (
-                                    <div className="rounded-xl p-4 bg-emerald-50 border border-emerald-100">
-                                        <h4 className="font-semibold mb-3 text-emerald-700">
-                                            Estado de Cuenta por Cobrar
-                                        </h4>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between">
-                                                <span className="text-neutral-700">Total a Cobrar</span>
-                                                <span className="font-medium">
-                          {money(data.cxc.montoPendienteBob)}
-                        </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-neutral-700">Pagos aplicados</span>
-                                                <span className="font-medium">
-                          {money(data.cxc.totalPagosAplicadosBob)}
-                        </span>
-                                            </div>
-                                            <div className="border-t my-2" />
-                                            <div className="flex justify-between text-base font-semibold text-emerald-700">
-                                                <span>Pendiente</span>
-                                                <span>{money(data.cxc.montoPendienteBob)}</span>
-                                            </div>
-                                            {data.cxc.fechaVencimiento && (
-                                                <div className="text-xs text-neutral-600">
-                                                    Vence: {data.cxc.fechaVencimiento}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                <CxcPanelDetalle ventaId={idVenta} />
                             </div>
                         </div>
                     )}

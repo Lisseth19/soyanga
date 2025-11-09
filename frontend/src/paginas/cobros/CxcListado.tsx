@@ -1,18 +1,16 @@
-// src/paginas/cobros/CxcListado.tsx
 import { useEffect, useMemo, useState } from "react";
 import { cobrosService } from "@/servicios/cobros";
 import type { CxcItem, EstadoCuenta, Page } from "@/types/cobros";
 import { AplicarPagoModal } from "./AplicarPagoModal";
 import VentaDetalle from "@/paginas/ventas/VentaDetalle";
-import { Calendar, Search, Eye, CreditCard } from "lucide-react";
+import { Search, Eye, CreditCard } from "lucide-react";
+import DateRangePicker from "@/componentes/cxc/DateRangePicker";
 
-// ==== Helpers de fecha ====
-// - Si viene "YYYY-MM-DD", lo tratamos como fecha LOCAL (no UTC) para evitar correr un día.
-// - Si viene con hora/offset (ISO real), usamos el Date normal.
+/* ==== helpers ==== */
+// Evita desfasar un día cuando viene "YYYY-MM-DD"
 function parseISOToLocalDate(iso?: string | null): Date | null {
     if (!iso) return null;
     const s = String(iso);
-    // case: solo fecha
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
         const [y, m, d] = s.split("-").map(Number);
         return new Date(y, (m || 1) - 1, d || 1);
@@ -42,17 +40,15 @@ export default function CxcListado() {
     // Modal: detalle de venta
     const [ventaDetalleId, setVentaDetalleId] = useState<number | null>(null);
 
-    // Carga desde el servicio
+    // ==== cargar ====
     async function load() {
         try {
             setLoading(true);
             setErr(null);
 
-            // No existe 'estado' en el servicio → filtramos luego
-            const soloAbiertas =
-                estado === "pendiente" || estado === "parcial" || estado === "vencido"
-                    ? true
-                    : undefined;
+            // ✅ Solo filtra "abiertas" (pendiente / parcial) cuando el estado seleccionado es uno de esos.
+            // Para "" (Todos), "pagado" y "vencido" mandamos FALSE para que el backend NO filtre.
+            const soloAbiertas = estado === "pendiente" || estado === "parcial" ? true : false;
 
             const res = await cobrosService.listarCxc({
                 soloAbiertas,
@@ -76,7 +72,7 @@ export default function CxcListado() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [estado, emisionDesde, emisionHasta, page, size]);
 
-    // Formato de fecha (local)
+    // formato fecha
     const fmt = useMemo(
         () =>
             new Intl.DateTimeFormat("es-BO", {
@@ -87,7 +83,7 @@ export default function CxcListado() {
         []
     );
 
-    // Resaltado simple de coincidencias del cliente
+    // resaltado de cliente
     function highlightCliente(nombre: string | number | undefined, q: string) {
         const txt = String(nombre ?? "");
         if (!q) return <>{txt || "—"}</>;
@@ -102,7 +98,7 @@ export default function CxcListado() {
         );
     }
 
-    // Filtrado client-side por estado y nombre + ORDENAMIENTO por más reciente
+    // client-side: filtro por estado específico y por nombre + orden
     const allRows = useMemo(() => data?.content ?? [], [data]);
     const rows = useMemo(() => {
         let list = allRows;
@@ -113,7 +109,6 @@ export default function CxcListado() {
             list = list.filter((r) => String(r.cliente ?? "").toLowerCase().includes(q));
         }
 
-        // Orden: fechaEmision DESC (más reciente primero). Empate: idCuentaCobrar DESC
         return list
             .slice()
             .sort((a, b) => {
@@ -124,7 +119,6 @@ export default function CxcListado() {
             });
     }, [allRows, estado, qCliente]);
 
-    // Totales de la página mostrada (post-filtro/sort)
     const totalPendientePagina = useMemo(
         () => rows.reduce((acc, r) => acc + (Number(r.montoPendienteBob) || 0), 0),
         [rows]
@@ -137,9 +131,7 @@ export default function CxcListado() {
             pagado: "bg-emerald-100 text-emerald-700",
             vencido: "bg-rose-100 text-rose-700",
         };
-        return (
-            <span className={`px-2 py-0.5 rounded text-xs font-medium ${map[e]}`}>{e}</span>
-        );
+        return <span className={`px-2 py-0.5 rounded text-xs font-medium ${map[e]}`}>{e}</span>;
     }
 
     return (
@@ -149,8 +141,7 @@ export default function CxcListado() {
                 <div>
                     <div className="text-xl font-semibold">Cuentas por Cobrar</div>
                     <div className="text-xs text-neutral-600 mt-0.5">
-                        {rows.length} resultado(s) en esta página · Pendiente total:{" "}
-                        <b>{totalPendientePagina.toFixed(2)} BOB</b>
+                        {rows.length} resultado(s) en esta página · Pendiente total: <b>{totalPendientePagina.toFixed(2)} BOB</b>
                     </div>
                 </div>
             </div>
@@ -177,14 +168,11 @@ export default function CxcListado() {
                     </select>
                 </div>
 
-                {/* Cliente (búsqueda en tiempo real) */}
+                {/* Cliente */}
                 <div>
                     <label className="block text-xs mb-1">Cliente</label>
                     <div className="relative">
-                        <Search
-                            size={16}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-400"
-                        />
+                        <Search size={16} className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-400" />
                         <input
                             type="text"
                             placeholder="Buscar por nombre…"
@@ -195,44 +183,19 @@ export default function CxcListado() {
                     </div>
                 </div>
 
-                {/* Emisión: Desde */}
-                <div>
-                    <label className="block text-xs mb-1">Emisión · Desde</label>
-                    <div className="relative">
-                        <Calendar
-                            size={16}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none"
-                        />
-                        <input
-                            type="date"
-                            className="border rounded pl-8 pr-3 py-2 w-full"
-                            value={emisionDesde || ""}
-                            onChange={(e) => {
-                                setEmisionDesde(e.target.value || undefined);
-                                setPage(0);
-                            }}
-                        />
-                    </div>
-                </div>
-
-                {/* Emisión: Hasta */}
-                <div>
-                    <label className="block text-xs mb-1">Emisión · Hasta</label>
-                    <div className="relative">
-                        <Calendar
-                            size={16}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none"
-                        />
-                        <input
-                            type="date"
-                            className="border rounded pl-8 pr-3 py-2 w-full"
-                            value={emisionHasta || ""}
-                            onChange={(e) => {
-                                setEmisionHasta(e.target.value || undefined);
-                                setPage(0);
-                            }}
-                        />
-                    </div>
+                {/* Rango de fechas (emisión) — el MISMO calendario que en Anticipos */}
+                <div className="md:col-span-2">
+                    <DateRangePicker
+                        from={emisionDesde}
+                        to={emisionHasta}
+                        onChange={(f, t) => {
+                            setEmisionDesde(f);
+                            setEmisionHasta(t);
+                            setPage(0);
+                        }}
+                        label="Rango de emisión"
+                        buttonWidth="w-full"
+                    />
                 </div>
             </div>
 
@@ -256,23 +219,17 @@ export default function CxcListado() {
                         </thead>
                         <tbody>
                         {rows.map((r) => {
-                            const isPagado =
-                                r.estadoCuenta === "pagado" || (r.montoPendienteBob ?? 0) <= 0;
-
+                            const isPagado = r.estadoCuenta === "pagado" || (r.montoPendienteBob ?? 0) <= 0;
                             const dEmi = parseISOToLocalDate(r.fechaEmision);
                             const dVen = parseISOToLocalDate(r.fechaVencimiento);
 
                             return (
                                 <tr key={r.idCuentaCobrar} className="border-t">
                                     <td className="px-3 py-2">#{r.idVenta}</td>
-                                    <td className="px-3 py-2">
-                                        {highlightCliente(r.cliente ?? r.idCliente, qCliente)}
-                                    </td>
+                                    <td className="px-3 py-2">{highlightCliente(r.cliente ?? r.idCliente, qCliente)}</td>
                                     <td className="px-3 py-2">{dEmi ? fmt.format(dEmi) : "—"}</td>
                                     <td className="px-3 py-2">{dVen ? fmt.format(dVen) : "—"}</td>
-                                    <td className="px-3 py-2 text-right">
-                                        {(r.montoPendienteBob ?? 0).toFixed(2)}
-                                    </td>
+                                    <td className="px-3 py-2 text-right">{(r.montoPendienteBob ?? 0).toFixed(2)}</td>
                                     <td className="px-3 py-2 text-center">{estadoChip(r.estadoCuenta)}</td>
                                     <td className="px-3 py-2 text-center">
                                         <div className="inline-flex gap-2">
@@ -290,11 +247,7 @@ export default function CxcListado() {
                                                     setShowPago(true);
                                                 }}
                                                 disabled={isPagado}
-                                                title={
-                                                    isPagado
-                                                        ? "Esta cuenta ya está pagada o no tiene saldo pendiente"
-                                                        : "Aplicar pago"
-                                                }
+                                                title={isPagado ? "Esta cuenta ya está pagada" : "Aplicar pago"}
                                             >
                                                 <CreditCard size={14} /> Aplicar pago
                                             </button>
@@ -317,16 +270,10 @@ export default function CxcListado() {
 
             {/* Paginación */}
             <div className="flex items-center justify-end gap-2">
-                <button
-                    className="border rounded px-2 py-1"
-                    disabled={page <= 0}
-                    onClick={() => setPage((p) => p - 1)}
-                >
+                <button className="border rounded px-2 py-1" disabled={page <= 0} onClick={() => setPage((p) => p - 1)}>
                     Anterior
                 </button>
-                <span className="text-xs">
-          Página {(data?.number ?? 0) + 1} / {data?.totalPages ?? 1}
-        </span>
+                <span className="text-xs">Página {(data?.number ?? 0) + 1} / {data?.totalPages ?? 1}</span>
                 <button
                     className="border rounded px-2 py-1"
                     disabled={!data || page + 1 >= (data.totalPages || 1)}
@@ -349,9 +296,7 @@ export default function CxcListado() {
             )}
 
             {/* Modal: detalle de venta */}
-            {ventaDetalleId !== null && (
-                <VentaDetalle idVenta={ventaDetalleId} onClose={() => setVentaDetalleId(null)} />
-            )}
+            {ventaDetalleId !== null && <VentaDetalle idVenta={ventaDetalleId} onClose={() => setVentaDetalleId(null)} />}
         </div>
     );
 }
