@@ -40,13 +40,89 @@ public class GlobalExceptionHandler {
             this.errors = errors;
         }
 
-        public int getStatus() { return status; }
-        public String getError() { return error; }
-        public String getMessage() { return message; }
-        public String getPath() { return path; }
-        public String getTimestamp() { return timestamp; }
-        public Map<String, Object> getErrors() { return errors; }
+        public int getStatus() {
+            return status;
+        }
+
+        public String getError() {
+            return error;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public String getTimestamp() {
+            return timestamp;
+        }
+
+        public Map<String, Object> getErrors() {
+            return errors;
+        }
     }
+
+    private static Throwable rootCause(Throwable t) {
+        Throwable r = t;
+        while (r.getCause() != null && r.getCause() != r)
+            r = r.getCause();
+        return r;
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
+    }
+
+    private static Map<String, Object> dbDetails(Throwable ex) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        Throwable root = rootCause(ex);
+
+        // Postgres driver
+        try {
+            Class<?> psqlEx = Class.forName("org.postgresql.util.PSQLException");
+            if (psqlEx.isInstance(root)) {
+                var sqlState = (String) psqlEx.getMethod("getSQLState").invoke(root);
+                map.put("sqlState", sqlState);
+                map.put("dbMessage", safe(root.getMessage()));
+            }
+        } catch (Exception ignore) {
+        }
+
+        // Hibernate JDBCException
+        try {
+            Class<?> jdbcEx = Class.forName("org.hibernate.exception.JDBCException");
+            if (jdbcEx.isInstance(ex)) {
+                var sql = (String) jdbcEx.getMethod("getSQL").invoke(ex);
+                map.put("sql", sql);
+            }
+        } catch (Exception ignore) {
+        }
+
+        // Spring JDBC exceptions with getSql()
+        try {
+            Class<?> badSql = Class.forName("org.springframework.jdbc.BadSqlGrammarException");
+            if (badSql.isInstance(ex)) {
+                var sql = (String) badSql.getMethod("getSql").invoke(ex);
+                map.put("sql", sql);
+            }
+        } catch (Exception ignore) {
+        }
+        try {
+            Class<?> unc = Class.forName("org.springframework.jdbc.UncategorizedSQLException");
+            if (unc.isInstance(ex)) {
+                var sql = (String) unc.getMethod("getSql").invoke(ex);
+                map.put("sql", sql);
+            }
+        } catch (Exception ignore) {
+        }
+
+        map.putIfAbsent("rootMessage", safe(root.getMessage()));
+        return map;
+    }
+
 
     private static Throwable rootCause(Throwable t) {
         Throwable r = t;
@@ -109,7 +185,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleJdbcGrammar(Exception ex, HttpServletRequest req) {
         var details = dbDetails(ex);
         var sqlState = String.valueOf(details.getOrDefault("sqlState", ""));
-        // Si es 42P.. (errores de sintaxis/parametrización en Postgres), respondemos 400
+        // Si es 42P.. (errores de sintaxis/parametrización en Postgres), respondemos
+        // 400
         boolean clientFault = sqlState.startsWith("42");
         var status = clientFault ? HttpStatus.BAD_REQUEST : HttpStatus.INTERNAL_SERVER_ERROR;
         var msg = clientFault ? "Consulta SQL inválida o parámetros mal tipados" : "Error de base de datos";
@@ -119,13 +196,21 @@ public class GlobalExceptionHandler {
 
     /* 500: errores JPA/Hibernate genéricos */
     @ExceptionHandler({
-        jakarta.persistence.PersistenceException.class,
-        org.springframework.orm.jpa.JpaSystemException.class
+
+            jakarta.persistence.PersistenceException.class,
+            org.springframework.orm.jpa.JpaSystemException.class
+
     })
     public ResponseEntity<ApiError> handleJpa(Exception ex, HttpServletRequest req) {
         var details = dbDetails(ex); // deja el método como lo tienes (usa reflection)
         log.error("[JPA] 500 on {} | details={}", req.getRequestURI(), details, ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+
+                .body(new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error de persistencia", req.getRequestURI(),
+                        details));
+    }
+
+    
             .body(new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error de persistencia", req.getRequestURI(), details));
     }
 
@@ -137,6 +222,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error de acceso a datos", req.getRequestURI(), details));
     }
+
 
     /* ================== Auth / permisos ================== */
 
@@ -175,15 +261,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
         var msg = "Parámetro inválido: " + ex.getName();
         var body = new ApiError(
-            HttpStatus.BAD_REQUEST,
-            msg,
-            req.getRequestURI(),
-            Map.of(
-                "param", ex.getName(),
-                "value", String.valueOf(ex.getValue()),
-                "requiredType", ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"
-            )
-        );
+                HttpStatus.BAD_REQUEST,
+                msg,
+                req.getRequestURI(),
+                Map.of(
+                        "param", ex.getName(),
+                        "value", String.valueOf(ex.getValue()),
+                        "requiredType",
+                        ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "desconocido"));
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -201,7 +286,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    /* ================== Integridad de datos (FK / UNIQUE / NOT NULL) ================== */
+    /*
+     * ================== Integridad de datos (FK / UNIQUE / NOT NULL)
+     * ==================
+     */
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
@@ -227,14 +315,21 @@ public class GlobalExceptionHandler {
         boolean isMyNotNull = vendorCode != null && vendorCode == 1048;
 
         // Heurísticas por mensaje
-        boolean msgForeign = low.contains("violates foreign key constraint") || low.contains("a foreign key constraint fails");
+
+        boolean msgForeign = low.contains("violates foreign key constraint")
+                || low.contains("a foreign key constraint fails");
+
         boolean msgUnique = low.contains("duplicate key") || low.contains("duplicate entry");
         boolean msgNotNull = low.contains("null value in column") || low.contains("cannot be null");
 
         Map<String, Object> extra = new LinkedHashMap<>();
-        if (constraintName != null) extra.put("constraint", constraintName);
+
+        if (constraintName != null)
+            extra.put("constraint", constraintName);
 
         // ✅ Prioridad: si el servicio ya dio un mensaje humano claro, úsalo tal cual
+        // (ej. clientes)
+
         if (custom.toLowerCase(Locale.ROOT).contains("no se puede eliminar el cliente")) {
             var body = new ApiError(HttpStatus.CONFLICT, custom, req.getRequestURI(), extra.isEmpty() ? null : extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
@@ -278,18 +373,28 @@ public class GlobalExceptionHandler {
 
         // NOT NULL → 400
         if (isPgNotNull || isMyNotNull || msgNotNull) {
-            var body = new ApiError(HttpStatus.BAD_REQUEST, "Campo requerido ausente.", req.getRequestURI(), extra.isEmpty() ? null : extra);
+
+            var body = new ApiError(HttpStatus.BAD_REQUEST, "Campo requerido ausente.", req.getRequestURI(),
+                    extra.isEmpty() ? null : extra);
+
+
             return ResponseEntity.badRequest().body(body);
         }
 
         // Genérico
-        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de integridad de datos", req.getRequestURI(), extra.isEmpty() ? null : extra);
+
+        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de integridad de datos", req.getRequestURI(),
+                extra.isEmpty() ? null : extra);
+
         return ResponseEntity.badRequest().body(body);
     }
 
     // (si Hibernate deja pasar su ConstraintViolationException sin envolver)
     @ExceptionHandler(org.hibernate.exception.ConstraintViolationException.class)
-    public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex, HttpServletRequest req) {
+
+    public ResponseEntity<ApiError> handleHibernateConstraint(org.hibernate.exception.ConstraintViolationException ex,
+            HttpServletRequest req) {
+
         String constraintName = ex.getConstraintName();
         String sqlState = null;
         Integer vendorCode = null;
@@ -298,7 +403,10 @@ public class GlobalExceptionHandler {
             vendorCode = sql.getErrorCode();
         }
         Map<String, Object> extra = new LinkedHashMap<>();
-        if (constraintName != null) extra.put("constraint", constraintName);
+
+        if (constraintName != null)
+            extra.put("constraint", constraintName);
+
 
         boolean isPgForeignKey = "23503".equals(sqlState);
         boolean isPgUnique = "23505".equals(sqlState);
@@ -315,11 +423,15 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
         if (isPgUnique) {
-            var body = new ApiError(HttpStatus.CONFLICT, "Registro duplicado.", req.getRequestURI(), extra.isEmpty() ? null : extra);
+
+            var body = new ApiError(HttpStatus.CONFLICT, "Registro duplicado.", req.getRequestURI(),
+                    extra.isEmpty() ? null : extra);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
         }
 
-        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos", req.getRequestURI(), extra.isEmpty() ? null : extra);
+        var body = new ApiError(HttpStatus.BAD_REQUEST, "Violación de restricción de base de datos",
+                req.getRequestURI(), extra.isEmpty() ? null : extra);
+
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -327,8 +439,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleAll(Exception ex, HttpServletRequest req) {
+
+
         log.error("[GENERIC] 500 on {}", req.getRequestURI(), ex);
-        var body = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", req.getRequestURI(), null);
+        var body = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", req.getRequestURI(),
+                null);
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
@@ -346,6 +462,7 @@ public class GlobalExceptionHandler {
             this.constraintName = constraintName;
             this.rawMessage = rawMessage;
         }
+
     }
 
     private SqlInfo extractSqlInfo(Throwable ex) {
@@ -367,9 +484,12 @@ public class GlobalExceptionHandler {
         Throwable cur = ex;
         while (cur != null) {
             if (cur instanceof SQLException sql) {
-                if (sqlState == null) sqlState = sql.getSQLState();
-                if (vendor == null) vendor = sql.getErrorCode();
-                if (raw == null || raw.isBlank()) raw = sql.getMessage();
+                if (sqlState == null)
+                    sqlState = sql.getSQLState();
+                if (vendor == null)
+                    vendor = sql.getErrorCode();
+                if (raw == null || raw.isBlank())
+                    raw = sql.getMessage();
             }
             cur = cur.getCause();
         }
