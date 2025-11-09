@@ -7,6 +7,7 @@ import com.soyanga.soyangabackend.dto.precios.*;
 import com.soyanga.soyangabackend.repositorio.catalogo.PresentacionProductoRepositorio;
 import com.soyanga.soyangabackend.repositorio.catalogo.TipoDeCambioRepositorio;
 import com.soyanga.soyangabackend.repositorio.precios.PrecioVentaHistoricoRepositorio;
+import com.soyanga.soyangabackend.seguridad.AuthUtils;
 
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
@@ -89,6 +90,7 @@ public class ReglasPreciosServicio {
                                                 .precioVentaBob(nuevo)
                                                 .fechaInicioVigencia(inicio)
                                                 .motivoCambio(motivo != null ? motivo : "Re-cálculo por TC (UI)")
+                                                .usuario(AuthUtils.currentUsername())
                                                 .build();
                                 historicoRepo.save(hist);
 
@@ -122,6 +124,8 @@ public class ReglasPreciosServicio {
                         return;
 
                 var inicioEf = (inicio != null) ? inicio : LocalDateTime.now();
+                // antes de lockVigenteHastaAhora(...)
+                historicoRepo.deleteFuturosDesde(idPresentacion, inicioEf);
 
                 // Cerrar vigente hasta ahora (sin tocar futuros)
                 historicoRepo.lockVigenteHastaAhora(idPresentacion, inicioEf)
@@ -139,6 +143,7 @@ public class ReglasPreciosServicio {
                                 .precioVentaBob(valor)
                                 .fechaInicioVigencia(inicioEf)
                                 .motivoCambio(motivo != null ? motivo : "Ajuste manual")
+                                .usuario(AuthUtils.currentUsername())
                                 .build();
                 historicoRepo.save(hist);
 
@@ -170,6 +175,7 @@ public class ReglasPreciosServicio {
                                 .precioVentaBob(hist.getPrecioVentaBob())
                                 .fechaInicioVigencia(ahora)
                                 .motivoCambio("Reversión a histórico " + idHistorico)
+                                .usuario(AuthUtils.currentUsername())
                                 .build();
                 historicoRepo.save(nuevo);
 

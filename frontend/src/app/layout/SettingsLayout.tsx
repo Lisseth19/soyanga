@@ -67,7 +67,7 @@ export default function SettingsLayout() {
 
   // Finanzas
   const canMonedas      = can("monedas:ver");
-  const canTiposCambio  = can("tipos-cambio:ver");
+  //const canTiposCambio  = can("tipos-cambio:ver");
   const canHistorialPecios  = can("historial-precios:ver");
   const canReglasPrecios  = can("reglas-precios:ver");
 
@@ -76,17 +76,17 @@ export default function SettingsLayout() {
   const canProductos        = can("productos:ver");
   const canUnidades         = can("unidades:ver");
   const canPresentaciones   = can("presentaciones:ver");
-  const canCodigosBarras    = can("codigos-barras:ver");
+  //const canCodigosBarras    = can("codigos-barras:ver");
 
   // ¿Existe landing de catálogo? (si quieres que SIEMPRE haya inicio al tener cualquier permiso, lo activamos)
   const hasAnyCatalogPerm =
-      canCategorias || canProductos || canUnidades || canPresentaciones || canCodigosBarras;
+      canCategorias || canProductos || canUnidades || canPresentaciones;
 
   // Si deseas que el "Inicio del Catálogo" exista siempre que haya cualquier permiso, lo marcamos allowed.
   const hasCatalogoInicio = hasAnyCatalogPerm; // cámbialo a `can("catalogo:ver")` si más adelante lo separas
 
   const hasAnyConfigPerm =
-      canSucursales || canAlmacenes || canMonedas || canTiposCambio;
+      canSucursales || canAlmacenes || canMonedas ||canHistorialPecios || canReglasPrecios ;
 
   /* =========================
      RUTAS (SSoT)
@@ -99,7 +99,7 @@ export default function SettingsLayout() {
 
       // CONFIG → FINANZAS
       { path: "/config/finanzas/monedas",      label: "Monedas",        Icon: DollarSign, allowed: canMonedas,     section: "finanzas" },
-      { path: "/config/finanzas/tipos-cambio", label: "Tipos de Cambio", Icon: Coins,      allowed: canTiposCambio, section: "finanzas" },
+      //{ path: "/config/finanzas/tipos-cambio", label: "Tipos de Cambio", Icon: Coins,      allowed: canTiposCambio, section: "finanzas" },
       { path: "/config/finanzas/historial-precios", label: "Historial de Precios de Productos", Icon: Coins,      allowed: canHistorialPecios, section: "finanzas" },
       { path: "/config/finanzas/reglas-precios", label: "Reglas de Precios", Icon: Coins,      allowed: canReglasPrecios, section: "finanzas" },
 
@@ -109,13 +109,13 @@ export default function SettingsLayout() {
       { path: "/catalogo/productos",           label: "Productos",           Icon: Package,     allowed: canProductos,      section: "catalogo" },
       { path: "/catalogo/unidades",            label: "Unidades de medida",  Icon: Ruler,       allowed: canUnidades,       section: "catalogo" },
       { path: "/catalogo/presentaciones",      label: "Presentaciones",      Icon: Layers3,     allowed: canPresentaciones, section: "catalogo" },
-      { path: "/catalogo/codigos-barras",      label: "Códigos de barras",   Icon: Barcode,     allowed: canCodigosBarras,  section: "catalogo" },
+      //{ path: "/catalogo/codigos-barras",      label: "Códigos de barras",   Icon: Barcode,     allowed: canCodigosBarras,  section: "catalogo" },
     ];
     return arr;
   }, [
     canSucursales, canAlmacenes,
-    canMonedas, canTiposCambio,
-    canCategorias, canProductos, canUnidades, canPresentaciones, canCodigosBarras,
+    canMonedas,
+    canCategorias, canProductos, canUnidades, canPresentaciones,
     hasCatalogoInicio,
   ]);
 
