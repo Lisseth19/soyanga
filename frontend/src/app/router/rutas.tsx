@@ -39,7 +39,7 @@ import NuevaSucursal from "@/paginas/sucursales/NuevaSucursal";
 import EditarSucursal from "@/paginas/sucursales/EditarSucursal";
 import AlmacenesPage from "@/paginas/almacenes/almacen";
 import MonedasPage from "@/paginas/moneda/Monedas";
-//import TiposCambioPage from "@/paginas/finanzas/TiposCambio";
+import TiposCambioPage from "@/paginas/finanzas/TiposCambio";
 
 // Catálogo interno
 import CatalogoIndex from "@/paginas/catalogo/Index";
@@ -47,7 +47,7 @@ import CategoriasPage from "@/paginas/categorias/Categorias";
 import ProductosPage from "@/paginas/inventario/Productos";
 import UnidadesPage from "@/paginas/catalogo/Unidades";
 import PresentacionesPage from "@/paginas/catalogo/Presentaciones";
-//import CodigosBarrasPage from "@/paginas/catalogo/CodigosBarras";
+import CodigosBarrasPage from "@/paginas/catalogo/CodigosBarras";
 
 // Compras
 import ComprasListaPage from "@/paginas/compras/ComprasLista";
@@ -80,10 +80,6 @@ function RedirectWithQuery({ to }: { to: string }) {
   const location = useLocation();
   return <Navigate to={`${to}${location.search}${location.hash}`} replace />;
 }
-
-//precios
-import ReglasDePrecios from "@/paginas/finanzas/ReglasDePrecios";
-import HistorialPrecios from "@/paginas/finanzas/HistorialPrecios";
 
 export const router = createBrowserRouter([
   // NUEVO: raíz del sitio redirige al inicio público
@@ -144,9 +140,8 @@ export const router = createBrowserRouter([
           { path: "estructura/sucursales", element: <SucursalesList /> },
           { path: "estructura/almacenes", element: <AlmacenesPage /> },
           { path: "finanzas/monedas", element: <MonedasPage /> },
-         // { path: "finanzas/tipos-cambio", element: <TiposCambioPage /> },
-          { path: "finanzas/reglas-precios", element: <ReglasDePrecios />},
-
+          { path: "finanzas/tipos-cambio", element: <TiposCambioPage /> },
+          { path: "finanzas/reglas-precios", element: <ReglasDePrecios /> },
           { path: "finanzas/historial-precios", element: <HistorialPrecios /> },
         ],
       },
@@ -161,14 +156,14 @@ export const router = createBrowserRouter([
           { path: "productos", element: <ProductosPage /> },
           { path: "unidades", element: <UnidadesPage /> },
           { path: "presentaciones", element: <PresentacionesPage /> },
-         // { path: "codigos-barras", element: <CodigosBarrasPage /> },
+          { path: "codigos-barras", element: <CodigosBarrasPage /> },
         ],
       },
 
       // === ALIASES de compatibilidad (evitan que te bote al público) ===
       { path: "/catalogo/almacenes", element: <Navigate to="/config/estructura/almacenes" replace /> },
       { path: "/catalogo/monedas", element: <Navigate to="/config/finanzas/monedas" replace /> },
-    //  { path: "/catalogo/tipos-cambio", element: <Navigate to="/config/finanzas/tipos-cambio" replace /> },
+      { path: "/catalogo/tipos-cambio", element: <Navigate to="/config/finanzas/tipos-cambio" replace /> },
 
       // === Compras ===
       {

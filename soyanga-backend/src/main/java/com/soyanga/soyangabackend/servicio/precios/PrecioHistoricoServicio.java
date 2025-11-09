@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.soyanga.soyangabackend.seguridad.AuthUtils;
+
 import java.time.LocalDateTime;
 
 @Service
@@ -63,7 +63,6 @@ public class PrecioHistoricoServicio {
                 .fechaInicioVigencia(inicio)
                 .fechaFinVigencia(null)
                 .motivoCambio(dto.getMotivoCambio())
-                .usuario(AuthUtils.currentUsername())
                 .build();
 
         nuevo = precioRepo.save(nuevo);

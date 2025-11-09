@@ -66,27 +66,36 @@ export default function SettingsLayout() {
   const canAlmacenes = can("almacenes:ver");
 
   // Finanzas
-  const canMonedas      = can("monedas:ver");
-  //const canTiposCambio  = can("tipos-cambio:ver");
-  const canHistorialPecios  = can("historial-precios:ver");
-  const canReglasPrecios  = can("reglas-precios:ver");
+  const canMonedas = can("monedas:ver");
+  const canTiposCambio = can("tipos-cambio:ver");
+  const canHistorialPrecios = can("historial-precios:ver"); // <- corregido el nombre
+  const canReglasPrecios = can("reglas-precios:ver");
 
   // Catálogo (granular)
-  const canCategorias       = can("categorias:ver");
-  const canProductos        = can("productos:ver");
-  const canUnidades         = can("unidades:ver");
-  const canPresentaciones   = can("presentaciones:ver");
-  //const canCodigosBarras    = can("codigos-barras:ver");
-
+  const canCategorias = can("categorias:ver");
+  const canProductos = can("productos:ver");
+  const canUnidades = can("unidades:ver");
+  const canPresentaciones = can("presentaciones:ver");
+  const canCodigosBarras = can("codigos-barras:ver");
 
   // ¿Existe landing de catálogo?
   const hasAnyCatalogPerm =
-      canCategorias || canProductos || canUnidades || canPresentaciones;
+    canCategorias ||
+    canProductos ||
+    canUnidades ||
+    canPresentaciones ||
+    canCodigosBarras;
 
   const hasCatalogoInicio = hasAnyCatalogPerm;
+
   // Importante: incluir TODOS los permisos de config
   const hasAnyConfigPerm =
-      canSucursales || canAlmacenes || canMonedas ||canHistorialPecios || canReglasPrecios ;
+    canSucursales ||
+    canAlmacenes ||
+    canMonedas ||
+    canTiposCambio ||
+    canHistorialPrecios ||
+    canReglasPrecios;
 
   /* =========================
      RUTAS (SSoT)
@@ -110,26 +119,92 @@ export default function SettingsLayout() {
       },
 
       // CONFIG → FINANZAS
-
-      { path: "/config/finanzas/monedas",      label: "Monedas",        Icon: DollarSign, allowed: canMonedas,     section: "finanzas" },
-      //{ path: "/config/finanzas/tipos-cambio", label: "Tipos de Cambio", Icon: Coins,      allowed: canTiposCambio, section: "finanzas" },
-      { path: "/config/finanzas/historial-precios", label: "Historial de Precios de Productos", Icon: Coins,      allowed: canHistorialPecios, section: "finanzas" },
-      { path: "/config/finanzas/reglas-precios", label: "Reglas de Precios", Icon: Coins,      allowed: canReglasPrecios, section: "finanzas" },
+      {
+        path: "/config/finanzas/monedas",
+        label: "Monedas",
+        Icon: DollarSign,
+        allowed: canMonedas,
+        section: "finanzas",
+      },
+      {
+        path: "/config/finanzas/tipos-cambio",
+        label: "Tipos de Cambio",
+        Icon: Coins,
+        allowed: canTiposCambio,
+        section: "finanzas",
+      },
+      {
+        path: "/config/finanzas/historial-precios",
+        label: "Historial de Precios de Productos",
+        Icon: Coins,
+        allowed: canHistorialPrecios,
+        section: "finanzas",
+      },
+      {
+        path: "/config/finanzas/reglas-precios",
+        label: "Reglas de Precios",
+        Icon: Coins,
+        allowed: canReglasPrecios,
+        section: "finanzas",
+      },
 
       // CATÁLOGO (incluye landing si aplica)
-      { path: "/catalogo",                     label: "Inicio del Catálogo", Icon: Layers3,     allowed: hasCatalogoInicio, section: "catalogo" },
-      { path: "/catalogo/categorias",          label: "Categorías",          Icon: Tags,        allowed: canCategorias,     section: "catalogo" },
-      { path: "/catalogo/productos",           label: "Productos",           Icon: Package,     allowed: canProductos,      section: "catalogo" },
-      { path: "/catalogo/unidades",            label: "Unidades de medida",  Icon: Ruler,       allowed: canUnidades,       section: "catalogo" },
-      { path: "/catalogo/presentaciones",      label: "Presentaciones",      Icon: Layers3,     allowed: canPresentaciones, section: "catalogo" },
-      //{ path: "/catalogo/codigos-barras",      label: "Códigos de barras",   Icon: Barcode,     allowed: canCodigosBarras,  section: "catalogo" },
+      {
+        path: "/catalogo",
+        label: "Inicio del Catálogo",
+        Icon: Layers3,
+        allowed: hasCatalogoInicio,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/categorias",
+        label: "Categorías",
+        Icon: Tags,
+        allowed: canCategorias,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/productos",
+        label: "Productos",
+        Icon: Package,
+        allowed: canProductos,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/unidades",
+        label: "Unidades de medida",
+        Icon: Ruler,
+        allowed: canUnidades,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/presentaciones",
+        label: "Presentaciones",
+        Icon: Layers3,
+        allowed: canPresentaciones,
+        section: "catalogo",
+      },
+      {
+        path: "/catalogo/codigos-barras",
+        label: "Códigos de barras",
+        Icon: Barcode,
+        allowed: canCodigosBarras,
+        section: "catalogo",
+      },
     ];
     return arr;
   }, [
-    canSucursales, canAlmacenes,
+    canSucursales,
+    canAlmacenes,
     canMonedas,
-    canCategorias, canProductos, canUnidades, canPresentaciones,
-
+    canTiposCambio,
+    canHistorialPrecios,
+    canReglasPrecios,
+    canCategorias,
+    canProductos,
+    canUnidades,
+    canPresentaciones,
+    canCodigosBarras,
     hasCatalogoInicio,
   ]);
 
@@ -397,9 +472,6 @@ export default function SettingsLayout() {
   /* =========================
      RENDER FINAL
      ========================= */
-   /* =========================
-     RENDER FINAL
-     ========================= */
   return (
     <>
       <div className="min-h-screen overflow-x-hidden px-0 py-6">
@@ -450,4 +522,3 @@ export default function SettingsLayout() {
     </>
   );
 }
-
