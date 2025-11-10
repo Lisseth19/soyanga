@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ventasService } from "@/servicios/ventas";
 import type { VentaDetalleRespuestaDTO, VentaTrazabilidadDTO } from "@/types/ventas";
 import VentaTrazabilidad from "@/paginas/ventas/VentaTrazabilidad";
-import CxcPanelDetalle from "@/componentes/cxc/CxcPanelDetalle";
+//import CxcPanelDetalle from "@/componentes/cxc/CxcPanelDetalle";
 import { almacenService, type OpcionIdNombre } from "@/servicios/almacen";
 
 function fmtFecha(iso?: string | null) {
@@ -16,10 +16,7 @@ function fmtFecha(iso?: string | null) {
 }
 function money(n?: number | null) {
     const v = Number(n ?? 0);
-    return v.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
+    return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function VentaDetalle({
@@ -41,10 +38,7 @@ export default function VentaDetalle({
     const [cxcPendiente, setCxcPendiente] = useState<number | null>(null);
 
     useEffect(() => {
-        almacenService
-            .options()
-            .then(setAlmacenes)
-            .catch(() => setAlmacenes([]));
+        almacenService.options().then(setAlmacenes).catch(() => setAlmacenes([]));
     }, []);
 
     useEffect(() => {
@@ -64,15 +58,12 @@ export default function VentaDetalle({
 
     // Si el DTO de detalle no trae CxC, intento obtenerlo desde trazabilidad
     useEffect(() => {
-        // Si ya vino en el detalle, úsalo
         const posible = Number((data as any)?.cxc?.montoPendienteBob ?? 0);
         if (posible > 0) {
             setCxcPendiente(posible);
             return;
         }
-        // Si es una venta al crédito, intenta obtener el pendiente desde trazabilidad
-        const esCredito =
-            String(data?.condicionDePago ?? "").toLowerCase() === "credito";
+        const esCredito = String(data?.condicionDePago ?? "").toLowerCase() === "credito";
         if (!esCredito) {
             setCxcPendiente(null);
             return;
@@ -80,7 +71,6 @@ export default function VentaDetalle({
         ventasService
             .trazabilidad(idVenta)
             .then((t: VentaTrazabilidadDTO) => {
-                // Intento varias formas comunes de llegar al monto pendiente/total a cobrar
                 const m1 = Number((t as any)?.cxc?.montoPendienteBob ?? 0);
                 const m2 = Number((t as any)?.cuentaPorCobrar?.montoPendienteBob ?? 0);
                 const m3 = Number((t as any)?.cxc?.totalACobrarBob ?? 0);
@@ -98,51 +88,48 @@ export default function VentaDetalle({
         // Base imponible (antes de impuesto)
         const baseImponible = Math.max(0, bruto - desc);
 
-        // Neto que manda el backend (incluye impuesto cuando es FACTURA)
+        // Neto del backend (incluye impuesto cuando es FACTURA)
         const netoInclImpuesto = Number(data?.totalNetoBob ?? 0);
 
         // Impuesto derivado
-        const esFactura =
-            String(data?.tipoDocumentoTributario ?? "").toLowerCase() === "factura";
-        const impuestoMonto = esFactura
-            ? Math.max(0, netoInclImpuesto - baseImponible)
-            : 0;
-        const impuestoPct =
-            baseImponible > 0 ? (impuestoMonto / baseImponible) * 100 : 0;
+        const esFactura = String(data?.tipoDocumentoTributario ?? "").toLowerCase() === "factura";
+        const impuestoMonto = esFactura ? Math.max(0, netoInclImpuesto - baseImponible) : 0;
+        const impuestoPct = baseImponible > 0 ? (impuestoMonto / baseImponible) * 100 : 0;
 
         // Interés
-        const esCredito =
-            String(data?.condicionDePago ?? "").toLowerCase() === "credito";
+        const esCredito = String(data?.condicionDePago ?? "").toLowerCase() === "credito";
 
-        // 1) Intenta porcentaje directo del DTO (varía de nombre según backend)
+        // 1) porcentaje directo, si viene
         let interesPctRaw =
             Number((data as any)?.interesCredito ?? 0) ||
             Number((data as any)?.interesCreditoPct ?? 0) ||
             Number((data as any)?.interes ?? 0);
 
-        // 2) Monto por diferencia con CxC (si el porcentaje no vino)
+        // 2) monto por diferencia con CxC (si no vino %)
         let interesMonto = 0;
         if (esCredito) {
             if (interesPctRaw > 0) {
                 interesMonto = netoInclImpuesto * (interesPctRaw / 100);
             } else {
-                // Si no hay % en DTO, derivar por diferencia con CxC (si lo tenemos)
                 const cxcTotal =
-                    Number((data as any)?.cxc?.montoPendienteBob ?? 0) ||
-                    Number(cxcPendiente ?? 0);
+                    Number((data as any)?.cxc?.montoPendienteBob ?? 0) || Number(cxcPendiente ?? 0);
                 if (cxcTotal > netoInclImpuesto) {
                     interesMonto = cxcTotal - netoInclImpuesto;
-                    // Derivar % para mostrarlo lindo
-                    if (netoInclImpuesto > 0) {
-                        interesPctRaw = (interesMonto / netoInclImpuesto) * 100;
-                    }
+                    if (netoInclImpuesto > 0) interesPctRaw = (interesMonto / netoInclImpuesto) * 100;
                 }
             }
         }
         const interesPct = interesPctRaw || 0;
 
-        // Total final mostrado (neto + interés)
-        const netoConTodo = netoInclImpuesto + interesMonto;
+        // ===== Anticipo aplicado (si existe en la CxC de la venta) =====
+        const anticipoAplicado =
+            Number((data as any)?.cxc?.totalAnticiposAplicadosBob ?? 0) ||
+            Number((data as any)?.cxc?.anticipoAplicadoBob ?? 0) ||
+            Number((data as any)?.cxc?.totalAnticipoBob ?? 0); // <-- agrega aquí más alias si tu backend usa otro nombre
+
+        // Totales visuales
+        const netoConTodo = netoInclImpuesto + interesMonto; // neto + impuesto + interés
+        const netoFinal = Math.max(0, netoConTodo - (anticipoAplicado || 0)); // restar anticipo
 
         return {
             bruto,
@@ -151,7 +138,9 @@ export default function VentaDetalle({
             impuestoPct,
             interesMonto,
             interesPct,
+            anticipoAplicado,
             netoConTodo,
+            netoFinal,
             netoSinInteres: netoInclImpuesto,
         };
     }, [data, cxcPendiente]);
@@ -170,8 +159,13 @@ export default function VentaDetalle({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/40" />
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-auto">
+            {/* overlay que cierra al click */}
+            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+            {/* contenedor: detenemos la propagación para no cerrar cuando se hace click dentro */}
+            <div
+                className="relative bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-auto"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b">
                     <h3 className="text-lg font-semibold">
@@ -186,10 +180,7 @@ export default function VentaDetalle({
                         >
                             Ver trazabilidad
                         </button>
-                        <button
-                            className="px-3 py-1 border rounded text-sm hover:bg-neutral-50"
-                            onClick={onClose}
-                        >
+                        <button className="px-3 py-1 border rounded text-sm hover:bg-neutral-50" onClick={onClose}>
                             Cerrar
                         </button>
                     </div>
@@ -220,9 +211,7 @@ export default function VentaDetalle({
 
                                         <div>
                                             <dt className="text-neutral-500">Tipo Doc.</dt>
-                                            <dd className="font-medium">
-                                                {String(data.tipoDocumentoTributario).toUpperCase()}
-                                            </dd>
+                                            <dd className="font-medium">{String(data.tipoDocumentoTributario).toUpperCase()}</dd>
                                         </div>
                                         <div>
                                             <dt className="text-neutral-500">Número</dt>
@@ -231,15 +220,11 @@ export default function VentaDetalle({
 
                                         <div>
                                             <dt className="text-neutral-500">Condición</dt>
-                                            <dd className="font-medium capitalize">
-                                                {String(data.condicionDePago).toLowerCase()}
-                                            </dd>
+                                            <dd className="font-medium capitalize">{String(data.condicionDePago).toLowerCase()}</dd>
                                         </div>
                                         <div>
                                             <dt className="text-neutral-500">Método de pago</dt>
-                                            <dd className="font-medium capitalize">
-                                                {String(data.metodoDePago).toLowerCase()}
-                                            </dd>
+                                            <dd className="font-medium capitalize">{String(data.metodoDePago).toLowerCase()}</dd>
                                         </div>
 
                                         {data.fechaVencimientoCredito && (
@@ -288,19 +273,14 @@ export default function VentaDetalle({
                                                     <td className="p-2">{it.producto}</td>
                                                     <td className="p-2 text-right">{it.cantidad}</td>
                                                     <td className="p-2 text-right">{money(it.precioUnitarioBob)}</td>
-                                                    <td className="p-2 text-right">
-                                                        {Number(it.descuentoPorcentaje ?? 0).toFixed(2)}
-                                                    </td>
+                                                    <td className="p-2 text-right">{Number(it.descuentoPorcentaje ?? 0).toFixed(2)}</td>
                                                     <td className="p-2 text-right">{money(it.descuentoMontoBob)}</td>
                                                     <td className="p-2 text-right font-medium">{money(it.subtotalBob)}</td>
                                                     <td className="p-2">
                                                         {it.lotes?.length ? (
                                                             <div className="flex flex-wrap gap-1">
                                                                 {it.lotes.map((l, i) => (
-                                                                    <span
-                                                                        key={i}
-                                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs"
-                                                                    >
+                                                                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs">
                                       {l.numeroLote} · {l.cantidad}
                                     </span>
                                                                 ))}
@@ -330,38 +310,38 @@ export default function VentaDetalle({
 
                                         <div className="flex justify-between">
                                             <span className="text-neutral-600">Total Descuento</span>
-                                            <span className="font-medium text-rose-500">
-                        ({money(totales.desc)})
-                      </span>
+                                            <span className="font-medium text-rose-500">({money(totales.desc)})</span>
                                         </div>
 
-                                        {/* Impuesto SIEMPRE visible */}
                                         <div className="flex justify-between">
-                      <span className="text-neutral-600">
-                        Impuesto ({(totales.impuestoPct ?? 0).toFixed(2)}%)
-                      </span>
+                                            <span className="text-neutral-600">Impuesto ({(totales.impuestoPct ?? 0).toFixed(2)}%)</span>
                                             <span className="font-medium">{money(totales.impuestoMonto)}</span>
                                         </div>
 
-                                        {/* Interés SIEMPRE visible */}
                                         <div className="flex justify-between">
-                      <span className="text-neutral-600">
-                        Interés ({(totales.interesPct ?? 0).toFixed(2)}%)
-                      </span>
+                                            <span className="text-neutral-600">Interés ({(totales.interesPct ?? 0).toFixed(2)}%)</span>
                                             <span className="font-medium">{money(totales.interesMonto)}</span>
                                         </div>
+
+                                        {/* NUEVO: Monto anticipo si aplica */}
+                                        {totales.anticipoAplicado > 0 && (
+                                            <div className="flex justify-between">
+                                                <span className="text-neutral-600">Monto anticipo</span>
+                                                <span className="font-medium text-emerald-600">- {money(totales.anticipoAplicado)}</span>
+                                            </div>
+                                        )}
 
                                         <div className="border-t my-2" />
 
                                         <div className="flex justify-between text-base font-semibold">
                                             <span>Total Neto</span>
-                                            <span>{money(totales.netoConTodo)}</span>
+                                            <span>{money(totales.netoFinal)}</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* CxC */}
-                                <CxcPanelDetalle ventaId={idVenta} />
+
+                                {/*  <CxcPanelDetalle ventaId={idVenta} />*/}
                             </div>
                         </div>
                     )}
@@ -369,9 +349,7 @@ export default function VentaDetalle({
             </div>
 
             {/* Modal: Trazabilidad */}
-            {openTraz && (
-                <VentaTrazabilidad idVenta={idVenta} onClose={() => setOpenTraz(false)} />
-            )}
+            {openTraz && <VentaTrazabilidad idVenta={idVenta} onClose={() => setOpenTraz(false)} />}
         </div>
     );
 }

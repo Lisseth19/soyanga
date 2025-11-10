@@ -10,8 +10,14 @@ import type {
 import { almacenService, type OpcionIdNombre } from "@/servicios/almacen";
 
 // Pickers del proyecto
-import { ClientePickerDialog, type ClienteLite } from "@/componentes/clientes/ClientePickerDialog";
-import { ImpuestoPickerDialog, type ImpuestoLite } from "@/componentes/impuestos/ImpuestoPickerDialog";
+import {
+    ClientePickerDialog,
+    type ClienteLite,
+} from "@/componentes/clientes/ClientePickerDialog";
+import {
+    ImpuestoPickerDialog,
+    type ImpuestoLite,
+} from "@/componentes/impuestos/ImpuestoPickerDialog";
 import PresentacionesPorAlmacenPicker from "@/componentes/almacenes/PresentacionesPorAlmacenPicker";
 import type { PresentacionEnAlmacenDTO } from "@/servicios/almacen";
 
@@ -23,7 +29,7 @@ import { popVentaDraft } from "@/servicios/ventaDraft";
 
 // Comprobante (ya lo tienes)
 import ComprobanteVenta from "@/componentes/ventas/ComprobanteVenta";
-import {useSearchParams} from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 /* ===================== util: fecha simple ===================== */
 function toISODate(d: Date) {
@@ -42,7 +48,11 @@ function fromISODate(s?: string) {
 function fmtHuman(d?: string) {
     if (!d) return "";
     const dt = fromISODate(d)!;
-    return dt.toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return dt.toLocaleDateString("es-BO", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    });
 }
 
 /* ===================== DatePopover (un calendario) ===================== */
@@ -72,7 +82,8 @@ function SingleDatePopover({
     useEffect(() => {
         function onDoc(e: MouseEvent) {
             if (!open) return;
-            if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
+            if (panelRef.current && !panelRef.current.contains(e.target as Node))
+                setOpen(false);
         }
         document.addEventListener("mousedown", onDoc);
         return () => document.removeEventListener("mousedown", onDoc);
@@ -87,7 +98,11 @@ function SingleDatePopover({
     }
     function sameDay(a?: Date, b?: Date) {
         if (!a || !b) return false;
-        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+        return (
+            a.getFullYear() === b.getFullYear() &&
+            a.getMonth() === b.getMonth() &&
+            a.getDate() === b.getDate()
+        );
     }
 
     function handlePick(day: Date) {
@@ -140,23 +155,33 @@ function SingleDatePopover({
             </button>
 
             {open && (
-                <div ref={panelRef} className="absolute z-50 mt-2 bg-white border rounded-xl p-3 shadow-lg w-[320px] text-[12px]">
+                <div
+                    ref={panelRef}
+                    className="absolute z-50 mt-2 bg-white border rounded-xl p-3 shadow-lg w-[320px] text-[12px]"
+                >
                     <div className="flex items-center justify-between mb-2">
                         <button
                             type="button"
                             className="px-2 py-1 rounded hover:bg-neutral-100"
-                            onClick={() => setView((v) => new Date(v.getFullYear(), v.getMonth() - 1, 1))}
+                            onClick={() =>
+                                setView((v) => new Date(v.getFullYear(), v.getMonth() - 1, 1))
+                            }
                             title="Mes anterior"
                         >
                             ←
                         </button>
                         <div className="text-xs font-medium">
-                            {view.toLocaleDateString("es-BO", { month: "long", year: "numeric" })}
+                            {view.toLocaleDateString("es-BO", {
+                                month: "long",
+                                year: "numeric",
+                            })}
                         </div>
                         <button
                             type="button"
                             className="px-2 py-1 rounded hover:bg-neutral-100"
-                            onClick={() => setView((v) => new Date(v.getFullYear(), v.getMonth() + 1, 1))}
+                            onClick={() =>
+                                setView((v) => new Date(v.getFullYear(), v.getMonth() + 1, 1))
+                            }
                             title="Mes siguiente"
                         >
                             →
@@ -193,12 +218,22 @@ function SingleDatePopover({
                     </div>
 
                     <div className="flex items-center justify-between mt-3">
-                        <div className="text-[11px] text-neutral-600">{selected ? fmtHuman(toISODate(selected)) : "—"}</div>
+                        <div className="text-[11px] text-neutral-600">
+                            {selected ? fmtHuman(toISODate(selected)) : "—"}
+                        </div>
                         <div className="flex gap-2">
-                            <button type="button" className="px-2 py-1 text-[11px] border rounded hover:bg-neutral-50" onClick={clear}>
+                            <button
+                                type="button"
+                                className="px-2 py-1 text-[11px] border rounded hover:bg-neutral-50"
+                                onClick={clear}
+                            >
                                 Limpiar
                             </button>
-                            <button type="button" className="px-2 py-1 text-[11px] border rounded hover:bg-neutral-50" onClick={() => setOpen(false)}>
+                            <button
+                                type="button"
+                                className="px-2 py-1 text-[11px] border rounded hover:bg-neutral-50"
+                                onClick={() => setOpen(false)}
+                            >
                                 Cerrar
                             </button>
                         </div>
@@ -225,7 +260,11 @@ type ItemRow = {
     lotes?: Array<{ idLote: number; cantidad: number }>;
 };
 
-const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n: number) =>
+    n.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 
 export default function VentaNueva({
                                        onClose,
@@ -239,7 +278,10 @@ export default function VentaNueva({
     // ===== Combos / datos base =====
     const [almacenes, setAlmacenes] = useState<OpcionIdNombre[]>([]);
     useEffect(() => {
-        almacenService.options().then(setAlmacenes).catch(() => setAlmacenes([]));
+        almacenService
+            .options()
+            .then(setAlmacenes)
+            .catch(() => setAlmacenes([]));
     }, []);
 
     // ===== Estado general =====
@@ -266,6 +308,8 @@ export default function VentaNueva({
     // Origen anticipo (draft o query param)
     const anticipoCtxRef = useRef<{ idAnticipo: number; aplicarAuto?: boolean } | null>(null);
     const [bannerAnticipo, setBannerAnticipo] = useState<{ idAnticipo: number } | null>(null);
+    // NUEVO: saldo disponible del anticipo (para mostrar y descontar en UI)
+    const [anticipoSaldo, setAnticipoSaldo] = useState<number>(0);
 
     // Dialogs
     const [cliPickerOpen, setCliPickerOpen] = useState(false);
@@ -322,7 +366,7 @@ export default function VentaNueva({
         if (tipoDoc !== "factura") setImpuestoSel(null);
     }, [tipoDoc]);
 
-    // ====== Cargar borrador desde Anticipo o por ?anticipo=ID ======
+    /* ====== Cargar borrador desde Anticipo o por ?anticipo=ID ====== */
     useEffect(() => {
         const draft = popVentaDraft();
 
@@ -353,6 +397,31 @@ export default function VentaNueva({
                 setBannerAnticipo({ idAnticipo: draft.source.idAnticipo });
             }
 
+            // Si tu saveVentaDraftFromAnticipo guardó saldoAnticipoBob:
+            if ((draft as any)?.saldoAnticipoBob != null) {
+                setAnticipoSaldo(Number((draft as any).saldoAnticipoBob) || 0);
+            }
+
+            // Fallback: si no vino en el draft, lo calculamos rápido
+            (async () => {
+                const id = draft?.source?.idAnticipo;
+                if (!id) return;
+                try {
+                    const [a, apps] = await Promise.all([
+                        anticiposService.obtener(id),
+                        anticiposService.listarAplicacionesPorAnticipo(id, { page: 0, size: 1000 }),
+                    ]);
+                    const aplicado = (apps?.content ?? []).reduce(
+                        (acc, it) => acc + (Number(it.montoAplicadoBob) || 0),
+                        0
+                    );
+                    const saldo = Math.max(0, (Number((a as any)?.montoBob) || 0) - aplicado);
+                    setAnticipoSaldo(saldo);
+                } catch {
+                    /* noop */
+                }
+            })();
+
             // Precargar items base (sin nombres/precios)
             const base: ItemRow[] = (draft.items ?? []).map((it) => ({
                 idPresentacion: it.idPresentacion,
@@ -365,7 +434,8 @@ export default function VentaNueva({
                 imagenUrl: null,
 
                 // ⬇️ viene del draft del anticipo
-                idAlmacenOrigen: (it as any).idAlmacenOrigen ?? draft.idAlmacenDespacho ?? null,
+                idAlmacenOrigen:
+                    (it as any).idAlmacenOrigen ?? draft.idAlmacenDespacho ?? null,
                 lotes: (it as any).lotes ?? undefined,
             }));
 
@@ -373,19 +443,25 @@ export default function VentaNueva({
 
             // Enriquecer nombres y precios
             (async () => {
-                const presIds = Array.from(new Set((draft.items ?? []).map((x) => x.idPresentacion)));
+                const presIds = Array.from(
+                    new Set((draft.items ?? []).map((x) => x.idPresentacion))
+                );
                 let priceById: Record<number, number | null> = {};
                 if (draft.idAlmacenDespacho) {
                     try {
-                        const r: any = await (almacenService as any).listarPresentaciones(draft.idAlmacenDespacho, {
-                            page: 0,
-                            size: Math.max(200, presIds.length),
-                            soloConStock: false,
-                        });
+                        const r: any = await (almacenService as any).listarPresentaciones(
+                            draft.idAlmacenDespacho,
+                            {
+                                page: 0,
+                                size: Math.max(200, presIds.length),
+                                soloConStock: false,
+                            }
+                        );
                         const list: any[] = r?.content ?? [];
                         for (const it of list) {
                             const pid = Number(it.idPresentacion ?? it.id);
-                            const precio = typeof it?.precioBob === "number" ? it.precioBob : null;
+                            const precio =
+                                typeof it?.precioBob === "number" ? it.precioBob : null;
                             priceById[pid] = precio;
                         }
                     } catch {
@@ -409,12 +485,27 @@ export default function VentaNueva({
                                 p?.textoPresentacion ??
                                 null;
                             const sku = p?.codigoSku ?? p?.sku ?? null;
-                            const precioBase = Number(p?.precioBob ?? p?.precioVenta ?? p?.precio ?? 0) || 0;
+                            const precioBase = Number(
+                                p?.precioBob ?? p?.precioVenta ?? p?.precio ?? 0
+                            ) || 0;
                             const precioFinal = priceById[pid] ?? precioBase;
-                            return [pid, { nombre: producto && present ? `${producto} · ${present}` : producto ?? present ?? `Presentación #${pid}`, sku, precio: precioFinal }] as const;
+                            return [
+                                pid,
+                                {
+                                    nombre:
+                                        producto && present
+                                            ? `${producto} · ${present}`
+                                            : producto ?? present ?? `Presentación #${pid}`,
+                                    sku,
+                                    precio: precioFinal,
+                                },
+                            ] as const;
                         } catch {
                             const precioFinal = priceById[pid] ?? 0;
-                            return [pid, { nombre: `Presentación #${pid}`, sku: null, precio: precioFinal }] as const;
+                            return [
+                                pid,
+                                { nombre: `Presentación #${pid}`, sku: null, precio: precioFinal },
+                            ] as const;
                         }
                     })
                 );
@@ -436,23 +527,34 @@ export default function VentaNueva({
             return;
         }
 
-        // Si no hubo draft, mirar ?anticipo=ID
+        // ===== Sin draft: mirar ?anticipo=ID y precargar saldo =====
         const anticipoParam = sp.get("anticipo");
         if (anticipoParam && /^\d+$/.test(anticipoParam)) {
             const idAnticipo = Number(anticipoParam);
             anticipoCtxRef.current = { idAnticipo, aplicarAuto: true };
             setBannerAnticipo({ idAnticipo });
-        }
 
-        try {
-            const url = new URL(window.location.href);
-            const anticipoParam = url.searchParams.get("anticipo");
-            if (anticipoParam && /^\d+$/.test(anticipoParam)) {
-                const idAnticipo = Number(anticipoParam);
-                anticipoCtxRef.current = { idAnticipo, aplicarAuto: true };
-                setBannerAnticipo({ idAnticipo });
-            }
-        } catch { /* noop */ }
+            // ✅ cargar saldo del anticipo para mostrar en totales
+            (async () => {
+                try {
+                    const [a, apps] = await Promise.all([
+                        anticiposService.obtener(idAnticipo),
+                        anticiposService.listarAplicacionesPorAnticipo(idAnticipo, {
+                            page: 0,
+                            size: 1000,
+                        }),
+                    ]);
+                    const aplicado = (apps?.content ?? []).reduce(
+                        (acc, it) => acc + (Number(it.montoAplicadoBob) || 0),
+                        0
+                    );
+                    const saldo = Math.max(0, (Number((a as any)?.montoBob) || 0) - aplicado);
+                    setAnticipoSaldo(saldo);
+                } catch {
+                    /* noop */
+                }
+            })();
+        }
     }, [sp]);
 
     // Si el usuario cambia manualmente el almacén, recalculamos precios por ese almacén
@@ -460,19 +562,27 @@ export default function VentaNueva({
         (async () => {
             if (!idAlmacen || items.length === 0) return;
             try {
-                const r: any = await (almacenService as any).listarPresentaciones(idAlmacen, {
-                    page: 0,
-                    size: Math.max(200, items.length),
-                    soloConStock: false,
-                });
+                const r: any = await (almacenService as any).listarPresentaciones(
+                    idAlmacen,
+                    {
+                        page: 0,
+                        size: Math.max(200, items.length),
+                        soloConStock: false,
+                    }
+                );
                 const list: any[] = r?.content ?? [];
                 const priceById: Record<number, number | null> = {};
-                const labelById: Record<number, { producto?: string | null; sku?: string | null }> = {};
+                const labelById: Record<
+                    number,
+                    { producto?: string | null; sku?: string | null }
+                > = {};
                 for (const it of list) {
                     const pid = Number(it.idPresentacion ?? it.id);
-                    priceById[pid] = typeof it?.precioBob === "number" ? it.precioBob : null;
+                    priceById[pid] =
+                        typeof it?.precioBob === "number" ? it.precioBob : null;
                     labelById[pid] = {
-                        producto: it?.productoNombre ?? it?.nombreProducto ?? it?.producto ?? null,
+                        producto:
+                            it?.productoNombre ?? it?.nombreProducto ?? it?.producto ?? null,
                         sku: it?.sku ?? it?.codigoSku ?? null,
                     };
                 }
@@ -515,7 +625,8 @@ export default function VentaNueva({
                 sku: p.sku ?? null,
                 producto: p.producto ?? null,
                 cantidad: 1,
-                precioUnitarioBob: typeof p.precioBob === "number" ? p.precioBob : null,
+                precioUnitarioBob:
+                    typeof p.precioBob === "number" ? p.precioBob : null,
                 descuentoPorcentaje: null,
                 descuentoMontoBob: null,
                 imagenUrl: p.imagenUrl ?? null,
@@ -549,9 +660,10 @@ export default function VentaNueva({
         setLastVentaId(null);
         anticipoCtxRef.current = null;
         setBannerAnticipo(null);
+        setAnticipoSaldo(0);
     }
 
-    // ===== Totales (sin descontar anticipo en UI; se aplicará al guardar) =====
+    // ===== Totales (con vista de anticipo si aplica) =====
     const tot = useMemo(() => {
         let bruto = 0;
         let descTotal = 0;
@@ -566,14 +678,47 @@ export default function VentaNueva({
             descTotal += desc;
         }
         const netoBase = Math.max(0, bruto - descTotal);
-        const impPct = tipoDoc === "factura" && impuestoSel ? Number(impuestoSel.porcentaje || 0) : 0;
+
+        const impPct =
+            tipoDoc === "factura" && impuestoSel
+                ? Number(impuestoSel.porcentaje || 0)
+                : 0;
         const impMonto = netoBase * (impPct / 100);
         const conImpuesto = netoBase + impMonto;
+
         const intPct = condicion === "credito" ? Number(interesCredito || 0) : 0;
         const intMonto = conImpuesto * (intPct / 100);
-        const totalNeto = conImpuesto + intMonto;
-        return { bruto, descTotal, impPct, impMonto, intPct, intMonto, totalNeto };
-    }, [items, tipoDoc, impuestoSel, condicion, interesCredito]);
+
+        const totalNetoSinAnticipo = conImpuesto + intMonto;
+
+        // Solo mostramos/descontamos anticipo si existe contexto de anticipo
+        const anticipoVisible = !!bannerAnticipo;
+        const anticipoAplicar = anticipoVisible
+            ? Math.min(Number(anticipoSaldo || 0), totalNetoSinAnticipo)
+            : 0;
+
+        const totalNeto = Math.max(0, totalNetoSinAnticipo - anticipoAplicar);
+
+        return {
+            bruto,
+            descTotal,
+            impPct,
+            impMonto,
+            intPct,
+            intMonto,
+            anticipoAplicar,
+            totalNetoSinAnticipo,
+            totalNeto,
+        };
+    }, [
+        items,
+        tipoDoc,
+        impuestoSel,
+        condicion,
+        interesCredito,
+        bannerAnticipo,
+        anticipoSaldo,
+    ]);
 
     // ===== Submit =====
     const [saving, setSaving] = useState(false);
@@ -605,7 +750,6 @@ export default function VentaNueva({
             setErr("Para crédito, la fecha de vencimiento es obligatoria.");
             return;
         }
-
 
         const dto: VentaCrearDTO = {
             idCliente: idCliente ?? undefined,
@@ -660,16 +804,25 @@ export default function VentaNueva({
             try {
                 const ctx = anticipoCtxRef.current;
                 if (ctx?.idAnticipo && (ctx.aplicarAuto ?? true)) {
-                    await anticiposService.convertirEnVenta(ctx.idAnticipo, { idVenta: idGenerado });
+                    await anticiposService.convertirEnVenta(ctx.idAnticipo, {
+                        idVenta: idGenerado,
+                    });
                 }
             } catch (e: any) {
-                console.warn("No se pudo convertir/aplicar el anticipo automáticamente:", e?.message || e);
-                alert("La venta se creó, pero no se pudo consumir/aplicar el anticipo automáticamente. Puedes hacerlo desde el detalle del anticipo.");
+                console.warn(
+                    "No se pudo convertir/aplicar el anticipo automáticamente:",
+                    e?.message || e
+                );
+                alert(
+                    "La venta se creó, pero no se pudo consumir/aplicar el anticipo automáticamente. Puedes hacerlo desde el detalle del anticipo."
+                );
             }
 
             onCreated?.(idGenerado);
         } catch (e: any) {
-            setErr(e?.response?.data?.message || e?.message || "No se pudo crear la venta.");
+            setErr(
+                e?.response?.data?.message || e?.message || "No se pudo crear la venta."
+            );
         } finally {
             setSaving(false);
         }
@@ -684,8 +837,12 @@ export default function VentaNueva({
             if (nextActionRef.current === "print") {
                 const w = window.open("", "_blank");
                 if (!w) return;
-                w.document.write("<html><head><meta charset='utf-8'><title>Comprobante</title>");
-                w.document.write("<style>@page{size:A4;margin:12mm;} body{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica Neue,Arial}</style>");
+                w.document.write(
+                    "<html><head><meta charset='utf-8'><title>Comprobante</title>"
+                );
+                w.document.write(
+                    "<style>@page{size:A4;margin:12mm;} body{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica Neue,Arial}</style>"
+                );
                 w.document.write("</head><body>");
                 w.document.write(compRef.current.outerHTML);
                 w.document.write("</body></html>");
@@ -696,7 +853,11 @@ export default function VentaNueva({
                 try {
                     const html2canvas = (await import("html2canvas")).default;
                     const { jsPDF } = await import("jspdf");
-                    const canvas = await html2canvas(compRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+                    const canvas = await html2canvas(compRef.current, {
+                        scale: 2,
+                        backgroundColor: "#ffffff",
+                        useCORS: true,
+                    });
                     const img = canvas.toDataURL("image/png");
                     const pdf = new jsPDF("p", "mm", "a4");
                     const pageW = pdf.internal.pageSize.getWidth();
@@ -712,7 +873,9 @@ export default function VentaNueva({
                     }
                     pdf.save(`comprobante_venta_${lastVentaId ?? ""}.pdf`);
                 } catch {
-                    alert("Para descargar en PDF necesitas tener instalados 'html2canvas' y 'jspdf'. Puedes usar 'Imprimir' mientras tanto.");
+                    alert(
+                        "Para descargar en PDF necesitas tener instalados 'html2canvas' y 'jspdf'. Puedes usar 'Imprimir' mientras tanto."
+                    );
                 }
             }
             nextActionRef.current = null;
@@ -725,9 +888,12 @@ export default function VentaNueva({
     // === ESTILOS más pequeños ===
     const inputCls =
         "h-8 text-xs border border-neutral-300 rounded-md px-2 w-full focus:outline-none focus:ring-2 focus:ring-emerald-500";
-    const btn = "h-8 px-3 rounded-md border border-neutral-300 bg-white hover:bg-neutral-50 text-xs";
-    const btnPri = "h-8 px-4 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 text-xs";
-    const btnOk = "h-8 px-4 rounded-md border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-xs";
+    const btn =
+        "h-8 px-3 rounded-md border border-neutral-300 bg-white hover:bg-neutral-50 text-xs";
+    const btnPri =
+        "h-8 px-4 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 text-xs";
+    const btnOk =
+        "h-8 px-4 rounded-md border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-xs";
 
     const showClienteAdvertencia = tipoDoc === "factura" && !idCliente;
 
@@ -738,26 +904,42 @@ export default function VentaNueva({
                 <div className="flex items-center justify-between">
                     <div>
                         <h3 className="text-base font-semibold">Nueva venta</h3>
-                        <p className="text-[11px] text-neutral-500">Campos compactos y ordenados.</p>
+                        <p className="text-[11px] text-neutral-500">
+                            Campos compactos y ordenados.
+                        </p>
                     </div>
                 </div>
 
                 {/* Banner de origen anticipo */}
                 {bannerAnticipo && (
                     <div className="rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-2 text-xs">
-                        Cargado desde <b>anticipo #{bannerAnticipo.idAnticipo}</b>. Al guardar, se <b>consumirán las reservas</b> y se <b>aplicará el anticipo</b> a esta venta.
+                        Cargado desde <b>anticipo #{bannerAnticipo.idAnticipo}</b>. Al
+                        guardar, se <b>consumirán las reservas</b> y se{" "}
+                        <b>aplicará el anticipo</b> a esta venta.
                     </div>
                 )}
 
-                {err && <div className="rounded-md border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-xs">{err}</div>}
+                {err && (
+                    <div className="rounded-md border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-xs">
+                        {err}
+                    </div>
+                )}
 
                 {/* Datos generales */}
                 <section className="rounded-xl border border-neutral-200 p-3">
                     <div className="grid grid-cols-12 gap-2">
                         {/* Tipo de Documento */}
                         <div className="col-span-12 md:col-span-2">
-                            <label className="block text-[11px] font-medium mb-1">Tipo de Documento</label>
-                            <select className={inputCls} value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value as TipoDocumentoTributario)}>
+                            <label className="block text-[11px] font-medium mb-1">
+                                Tipo de Documento
+                            </label>
+                            <select
+                                className={inputCls}
+                                value={tipoDoc}
+                                onChange={(e) =>
+                                    setTipoDoc(e.target.value as TipoDocumentoTributario)
+                                }
+                            >
                                 <option value="boleta">Boleta</option>
                                 <option value="factura">Factura</option>
                             </select>
@@ -765,7 +947,9 @@ export default function VentaNueva({
 
                         {/* Número (preview → confirmado al guardar) */}
                         <div className="col-span-12 md:col-span-3">
-                            <label className="block text-[11px] font-medium mb-1">N° Documento</label>
+                            <label className="block text-[11px] font-medium mb-1">
+                                N° Documento
+                            </label>
                             <input
                                 className={inputCls}
                                 readOnly
@@ -773,21 +957,35 @@ export default function VentaNueva({
                                 placeholder="—"
                                 title="Se asigna definitivamente al guardar; puede variar si otra venta se crea antes."
                             />
-                            <div className="text-[10px] mt-1 text-neutral-500">Se confirma al guardar.</div>
+                            <div className="text-[10px] mt-1 text-neutral-500">
+                                Se confirma al guardar.
+                            </div>
                         </div>
 
                         {/* Impuesto (solo factura) */}
                         {tipoDoc === "factura" && (
                             <div className="col-span-12 md:col-span-3">
-                                <label className="block text-[11px] font-medium mb-1">Impuesto</label>
+                                <label className="block text-[11px] font-medium mb-1">
+                                    Impuesto
+                                </label>
                                 <div className="flex gap-2">
                                     <input
                                         className={inputCls}
                                         readOnly
-                                        value={impuestoSel ? `${impuestoSel.nombre} (${Number(impuestoSel.porcentaje).toFixed(2)}%)` : ""}
+                                        value={
+                                            impuestoSel
+                                                ? `${impuestoSel.nombre} (${Number(
+                                                    impuestoSel.porcentaje
+                                                ).toFixed(2)}%)`
+                                                : ""
+                                        }
                                         placeholder="Selecciona…"
                                     />
-                                    <button type="button" className={btn} onClick={() => setImpPickerOpen(true)}>
+                                    <button
+                                        type="button"
+                                        className={btn}
+                                        onClick={() => setImpPickerOpen(true)}
+                                    >
                                         Sel.
                                     </button>
                                 </div>
@@ -796,36 +994,60 @@ export default function VentaNueva({
 
                         {/* Cliente */}
                         <div className="col-span-12 md:col-span-4">
-                            <label className="block text-[11px] font-medium mb-1">Cliente</label>
+                            <label className="block text-[11px] font-medium mb-1">
+                                Cliente
+                            </label>
                             <div className="flex gap-2">
                                 <input
                                     className={inputCls}
-                                    placeholder={tipoDoc === "factura" ? "Escribe o selecciona (obligatorio en factura)..." : "Escribe o selecciona (opcional)"}
+                                    placeholder={
+                                        tipoDoc === "factura"
+                                            ? "Escribe o selecciona (obligatorio en factura)..."
+                                            : "Escribe o selecciona (opcional)"
+                                    }
                                     value={clienteNombre}
                                     onChange={(e) => {
                                         setClienteNombre(e.target.value); // permite escribir manualmente
                                         setIdCliente(null); // si escribe, se desasocia la selección previa
                                     }}
                                 />
-                                <button type="button" className={btn} onClick={() => setCliPickerOpen(true)}>
+                                <button
+                                    type="button"
+                                    className={btn}
+                                    onClick={() => setCliPickerOpen(true)}
+                                >
                                     Lista
                                 </button>
                             </div>
 
                             {/* Advertencia cuando es FACTURA y no hay cliente seleccionado */}
                             {showClienteAdvertencia && (
-                                <div className="text-[11px] text-rose-600 mt-1">el cliente es obligatorio.</div>
+                                <div className="text-[11px] text-rose-600 mt-1">
+                                    el cliente es obligatorio.
+                                </div>
                             )}
 
-                            <div className={`text-[10px] mt-1 ${idCliente ? "text-emerald-700" : "text-neutral-500"}`}>
+                            <div
+                                className={`text-[10px] mt-1 ${
+                                    idCliente ? "text-emerald-700" : "text-neutral-500"
+                                }`}
+                            >
                                 {idCliente ? `Seleccionado (ID: ${idCliente})` : "Sin selección"}
                             </div>
                         </div>
 
                         {/* Condición */}
                         <div className="col-span-12 md:col-span-3">
-                            <label className="block text-[11px] font-medium mb-1">Condición de Pago</label>
-                            <select className={inputCls} value={condicion} onChange={(e) => setCondicion(e.target.value as CondicionPago)}>
+                            <label className="block text-[11px] font-medium mb-1">
+                                Condición de Pago
+                            </label>
+                            <select
+                                className={inputCls}
+                                value={condicion}
+                                onChange={(e) =>
+                                    setCondicion(e.target.value as CondicionPago)
+                                }
+                            >
                                 <option value="contado">Contado</option>
                                 <option value="credito">Crédito</option>
                             </select>
@@ -834,15 +1056,23 @@ export default function VentaNueva({
                         {/* Fecha Venc. (solo crédito) */}
                         {condicion === "credito" && (
                             <div className="col-span-12 md:col-span-2">
-                                <label className="block text-[11px] font-medium mb-1">Fecha Venc.</label>
-                                <SingleDatePopover value={fechaVenc || undefined} onChange={(v) => setFechaVenc(v || "")} placeholder="Selecciona fecha" />
+                                <label className="block text-[11px] font-medium mb-1">
+                                    Fecha Venc.
+                                </label>
+                                <SingleDatePopover
+                                    value={fechaVenc || undefined}
+                                    onChange={(v) => setFechaVenc(v || "")}
+                                    placeholder="Selecciona fecha"
+                                />
                             </div>
                         )}
 
                         {/* Interés (solo crédito) */}
                         {condicion === "credito" && (
                             <div className="col-span-12 md:col-span-2">
-                                <label className="block text-[11px] font-medium mb-1">Interés (%)</label>
+                                <label className="block text-[11px] font-medium mb-1">
+                                    Interés (%)
+                                </label>
                                 <input
                                     type="number"
                                     min={0}
@@ -857,8 +1087,14 @@ export default function VentaNueva({
 
                         {/* Método */}
                         <div className="col-span-12 md:col-span-2">
-                            <label className="block text-[11px] font-medium mb-1">Método de Pago</label>
-                            <select className={inputCls} value={metodo} onChange={(e) => setMetodo(e.target.value as MetodoPago)}>
+                            <label className="block text-[11px] font-medium mb-1">
+                                Método de Pago
+                            </label>
+                            <select
+                                className={inputCls}
+                                value={metodo}
+                                onChange={(e) => setMetodo(e.target.value as MetodoPago)}
+                            >
                                 <option value="efectivo">Efectivo</option>
                                 <option value="transferencia">Transferencia</option>
                                 <option value="mixto">Mixto</option>
@@ -867,11 +1103,15 @@ export default function VentaNueva({
 
                         {/* Almacén */}
                         <div className="col-span-12 md:col-span-3">
-                            <label className="block text-[11px] font-medium mb-1">Almacén de despacho</label>
+                            <label className="block text-[11px] font-medium mb-1">
+                                Almacén de despacho
+                            </label>
                             <select
                                 className={inputCls}
                                 value={idAlmacen ?? ""}
-                                onChange={(e) => setIdAlmacen(e.target.value ? Number(e.target.value) : null)}
+                                onChange={(e) =>
+                                    setIdAlmacen(e.target.value ? Number(e.target.value) : null)
+                                }
                             >
                                 <option value="">Seleccione…</option>
                                 {almacenes.map((a) => (
@@ -888,7 +1128,12 @@ export default function VentaNueva({
                 <section className="rounded-xl border border-neutral-200 p-3 space-y-3">
                     <div className="flex items-center justify-between">
                         <h4 className="text-xs font-semibold text-neutral-700">Ítems</h4>
-                        <button type="button" className={btn} onClick={() => setAddFromAlmOpen(true)} disabled={!idAlmacen}>
+                        <button
+                            type="button"
+                            className={btn}
+                            onClick={() => setAddFromAlmOpen(true)}
+                            disabled={!idAlmacen}
+                        >
                             Agregar desde almacén
                         </button>
                     </div>
@@ -909,7 +1154,10 @@ export default function VentaNueva({
                             <tbody>
                             {items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-3 py-6 text-center text-neutral-500">
+                                    <td
+                                        colSpan={7}
+                                        className="px-3 py-6 text-center text-neutral-500"
+                                    >
                                         Sin ítems. Usa “Agregar desde almacén”.
                                     </td>
                                 </tr>
@@ -920,7 +1168,10 @@ export default function VentaNueva({
                                     const linea = pu * cant;
                                     const dPct = Number(it.descuentoPorcentaje ?? 0) || 0;
                                     const dMonto = Number(it.descuentoMontoBob ?? 0) || 0;
-                                    const desc = Math.min(linea, Math.max(0, linea * (dPct / 100) + dMonto));
+                                    const desc = Math.min(
+                                        linea,
+                                        Math.max(0, linea * (dPct / 100) + dMonto)
+                                    );
                                     const importe = Math.max(0, linea - desc);
                                     return (
                                         <tr key={idx} className="even:bg-neutral-50/40">
@@ -931,7 +1182,9 @@ export default function VentaNueva({
                                                         readOnly
                                                         value={
                                                             it.producto
-                                                                ? `${it.producto}${it.sku ? " · " + it.sku : ""}`
+                                                                ? `${it.producto}${
+                                                                    it.sku ? " · " + it.sku : ""
+                                                                }`
                                                                 : it.idPresentacion
                                                                     ? `Presentación #${it.idPresentacion}`
                                                                     : ""
@@ -954,7 +1207,9 @@ export default function VentaNueva({
                                                     step={1}
                                                     className={`${inputCls} h-8 text-right`}
                                                     value={it.cantidad}
-                                                    onChange={(e) => setItem(idx, { cantidad: Number(e.target.value) })}
+                                                    onChange={(e) =>
+                                                        setItem(idx, { cantidad: Number(e.target.value) })
+                                                    }
                                                 />
                                             </td>
                                             <td className="px-3 py-2 border-b text-right">
@@ -965,7 +1220,9 @@ export default function VentaNueva({
                                                     value={it.precioUnitarioBob ?? ""}
                                                     onChange={(e) =>
                                                         setItem(idx, {
-                                                            precioUnitarioBob: e.target.value ? Number(e.target.value) : null,
+                                                            precioUnitarioBob: e.target.value
+                                                                ? Number(e.target.value)
+                                                                : null,
                                                         })
                                                     }
                                                 />
@@ -978,7 +1235,9 @@ export default function VentaNueva({
                                                     value={it.descuentoPorcentaje ?? ""}
                                                     onChange={(e) =>
                                                         setItem(idx, {
-                                                            descuentoPorcentaje: e.target.value ? Number(e.target.value) : null,
+                                                            descuentoPorcentaje: e.target.value
+                                                                ? Number(e.target.value)
+                                                                : null,
                                                         })
                                                     }
                                                 />
@@ -991,12 +1250,16 @@ export default function VentaNueva({
                                                     value={it.descuentoMontoBob ?? ""}
                                                     onChange={(e) =>
                                                         setItem(idx, {
-                                                            descuentoMontoBob: e.target.value ? Number(e.target.value) : null,
+                                                            descuentoMontoBob: e.target.value
+                                                                ? Number(e.target.value)
+                                                                : null,
                                                         })
                                                     }
                                                 />
                                             </td>
-                                            <td className="px-3 py-2 border-b text-right whitespace-nowrap">{fmt(importe)}</td>
+                                            <td className="px-3 py-2 border-b text-right whitespace-nowrap">
+                                                {fmt(importe)}
+                                            </td>
                                             <td className="px-3 py-2 border-b text-center">
                                                 <button
                                                     type="button"
@@ -1020,12 +1283,18 @@ export default function VentaNueva({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2">
                         <section className="rounded-xl border border-neutral-200 p-3">
-                            <label className="block text-[11px] font-medium mb-1">Observaciones</label>
-                            <textarea className={`${inputCls} min-h-[84px]`} value={obs} onChange={(e) => setObs(e.target.value)} />
+                            <label className="block text-[11px] font-medium mb-1">
+                                Observaciones
+                            </label>
+                            <textarea
+                                className={`${inputCls} min-h-[84px]`}
+                                value={obs}
+                                onChange={(e) => setObs(e.target.value)}
+                            />
                         </section>
                     </div>
 
-                    {/* ==== Totales (sin descontar anticipo en UI) ==== */}
+                    {/* ==== Totales (con visualización de anticipo si aplica) ==== */}
                     <section className="rounded-xl border border-neutral-200 p-3">
                         <div className="text-xs font-semibold mb-2">Totales</div>
 
@@ -1055,16 +1324,18 @@ export default function VentaNueva({
                             </div>
                         )}
 
+                        {/* NUEVO: Monto anticipo (solo si viene de anticipo) */}
+                        {bannerAnticipo && (
+                            <div className="flex justify-between py-1 text-xs">
+                                <span className="text-neutral-600">Monto anticipo</span>
+                                <span>- {fmt(tot.anticipoAplicar)}</span>
+                            </div>
+                        )}
+
                         <div className="border-t mt-2 pt-2 flex justify-between font-semibold">
                             <span>Total neto</span>
                             <span className="text-emerald-700">{fmt(tot.totalNeto)}</span>
                         </div>
-
-                        {bannerAnticipo && (
-                            <div className="text-[10px] mt-2 text-emerald-700">
-                                * El anticipo se aplicará al guardar (se verá reflejado en la CxC y en el detalle de la venta).
-                            </div>
-                        )}
                     </section>
                 </div>
 
@@ -1156,12 +1427,19 @@ export default function VentaNueva({
             {/* Modal comprobante (preview mínimo) */}
             {compOpen && lastVentaId && (
                 <div className="fixed inset-0 z-[1000]">
-                    <div className="absolute inset-0 bg-black/40" onClick={() => setCompOpen(false)} />
+                    <div
+                        className="absolute inset-0 bg-black/40"
+                        onClick={() => setCompOpen(false)}
+                    />
                     <div className="absolute inset-0 p-4 sm:p-8 flex items-start justify-center overflow-auto">
                         <div className="bg-white rounded-xl w-full max-w-[820px] shadow-2xl border">
                             <div className="p-3 border-b flex items-center justify-between">
-                                <h4 className="font-semibold text-sm">Comprobante de venta #{lastVentaId}</h4>
-                                <button className={btn} onClick={() => setCompOpen(false)}>Cerrar</button>
+                                <h4 className="font-semibold text-sm">
+                                    Comprobante de venta #{lastVentaId}
+                                </h4>
+                                <button className={btn} onClick={() => setCompOpen(false)}>
+                                    Cerrar
+                                </button>
                             </div>
                             <div className="p-3">
                                 <div ref={compRef}>

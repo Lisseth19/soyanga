@@ -12,7 +12,7 @@ export interface CxcItem {
     estadoCuenta: EstadoCuenta;
 }
 
-export type MetodoDePago = 'efectivo' | 'transferencia';
+export type MetodoDePago = 'efectivo' | 'transferencia'| 'mixto';
 
 export interface PagoCrearDTO {
     fechaPago?: string;

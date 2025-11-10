@@ -111,9 +111,7 @@ public class AnticipoConversionServicio {
 
         // poner reservada=0 en detalles del anticipo (si hubo reservas listadas)
         if (!reservas.isEmpty()) {
-            var dets = anticipoDetRepo.findByIdAnticipo(idAnticipo);
-            for (var d : dets) d.setCantidadReservada(BigDecimal.ZERO);
-            anticipoDetRepo.saveAll(dets);
+            anticipoDetRepo.clearReservadoPorAnticipo(idAnticipo);
         }
 
         // 2) aplicar anticipo

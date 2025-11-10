@@ -8,6 +8,7 @@ import { ClientePickerDialog, type ClienteLite } from "@/componentes/clientes/Cl
 import VentaNueva from "@/paginas/ventas/VentaNueva";
 import VentaDetalle from "@/paginas/ventas/VentaDetalle";
 import VentaTrazabilidad from "@/paginas/ventas/VentaTrazabilidad";
+import {Eye} from "lucide-react";
 
 /* ===================== utils de fecha (compatibles con Anticipos) ===================== */
 function toISODate(d: Date) {
@@ -668,7 +669,7 @@ export default function VentasListado() {
                                                     onClick={() => setDetalleOpen(v.idVenta)}
                                                     title="Ver detalle"
                                                 >
-                                                    Ver
+                                                    <Eye size={14} />
                                                 </button>
                                                 <button
                                                     className="px-2 py-1 border rounded-lg text-sm hover:bg-neutral-50"
